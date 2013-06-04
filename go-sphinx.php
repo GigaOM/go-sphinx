@@ -1,8 +1,8 @@
 <?php
 /*
-Plugin Name: Scriblio Search
-Plugin URI: http://about.scriblio.net/
-Version: 3.1
+Plugin Name: GigaOM Sphinx Search Integration
+Plugin URI: http://kitchen.gigaom.com/
+Version: 0.0
 Author: Casey Bisson
 Author URI: http://maisonbisson.com/blog/
 */

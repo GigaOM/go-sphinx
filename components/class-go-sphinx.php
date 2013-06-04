@@ -3,10 +3,28 @@
 class GO_Sphinx
 {
 
+	public $admin = FALSE;
 	public $client = FALSE;
+	public $test = FALSE;
 
 	public function __construct()
 	{
+		// the admin settings page
+		if ( is_admin() )
+		{
+			$this->admin();
+		}
+	}
+
+	public function admin()
+	{
+		if ( ! $this->admin )
+		{
+			require_once __DIR__ . '/class-go-sphinx-admin.php';
+			$this->admin = new GO_Sphinx_Admin;
+		}
+
+		return $this->admin;
 	}
 
 	public function client( $config )
@@ -14,7 +32,6 @@ class GO_Sphinx
 		if ( ! $this->client )
 		{
 			require_once __DIR__ . '/externals/sphinx.php';
-
 			$this->client = new SphinxClient();
 		}
 
@@ -31,6 +48,18 @@ class GO_Sphinx
 
 		return $this->client;
 	}
+
+	public function test()
+	{
+		if ( ! $this->test )
+		{
+			require_once __DIR__ . '/class-go-sphinx-test.php';
+			$this->test = new GO_Sphinx_Test;
+		}
+
+		return $this->test;
+	}
+
 }
 
 /**

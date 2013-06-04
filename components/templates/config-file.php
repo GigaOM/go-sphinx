@@ -1,20 +1,37 @@
-source wp
+
+source <?php echo $c->name; ?>
+
 {
 	type            = mysql
 
-	sql_host        = localhost
-	sql_user        = wp
-	sql_pass        =
-	sql_db          = wp
+	sql_host        = <?php echo $c->host; ?>
+
+	sql_user        = <?php echo $c->user; ?>
+
+	sql_pass        = <?php echo $c->pass; ?>
+
+	sql_db          = <?php echo $c->db; ?>
+
 	sql_port        = 3306	# optional, default is 3306
 
 	sql_query_range	= SELECT MIN( ID ), MAX( ID ) FROM wp_1_posts
 	sql_range_step = 1000
 	sql_query = \
-		SELECT p.ID, p.post_content, s.content, UNIX_TIMESTAMP( p.post_date_gmt ) AS post_date_gmt, UNIX_TIMESTAMP( p.post_modified_gmt ) AS post_modified_gmt, p.post_author, p.post_status, p.post_type, p.comment_count, p.post_parent, GROUP_CONCAT( term_taxonomy_id ) AS tt_id \
-		FROM wp_1_posts p \
-		LEFT JOIN wp_1_bcms_search s ON p.ID = s.post_id \
-		LEFT JOIN wp_1_term_relationships tr ON p.ID = tr.object_id \
+		SELECT \
+			p.ID, \
+			p.post_content, \
+			s.content, \
+			UNIX_TIMESTAMP( p.post_date_gmt ) AS post_date_gmt, \
+			UNIX_TIMESTAMP( p.post_modified_gmt ) AS post_modified_gmt, \
+			p.post_author, \
+			p.post_status, \
+			p.post_type, \
+			p.comment_count, \
+			p.post_parent, \
+			GROUP_CONCAT( term_taxonomy_id ) AS tt_id \
+		FROM <?php echo $c->posts_table; ?> p \
+		LEFT JOIN <?php echo $c->search_table; ?> s ON p.ID = s.post_id \
+		LEFT JOIN <?php echo $c->term_relationships_table; ?> tr ON p.ID = tr.object_id \
 		WHERE ID >= $start AND ID <= $end \
 		GROUP BY p.ID
 
@@ -27,14 +44,17 @@ source wp
 	sql_attr_uint       = post_parent
 	sql_attr_multi      = uint tt_id from field; \
 
-	sql_query_info  = SELECT * FROM wp_1_posts WHERE ID=$id
+	sql_query_info  = SELECT * FROM <?php echo $c->posts_table; ?> WHERE ID = $id
 }
 
 
-index wp
+index <?php echo $c->name; ?>
+
 {
-	source          = wp
-	path            = /var/lib/sphinx/wp
+	source          = <?php echo $c->name; ?>
+
+	path            = /var/lib/sphinx/<?php echo $c->name; ?>
+
 	docinfo         = extern
 	charset_type    = utf-8
 }
@@ -42,7 +62,7 @@ index wp
 
 indexer
 {
-	mem_limit		= 128M
+	mem_limit       = 128M
 }
 
 
