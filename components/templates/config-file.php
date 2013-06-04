@@ -1,4 +1,3 @@
-
 source <?php echo $c->name; ?>
 
 {
@@ -12,7 +11,7 @@ source <?php echo $c->name; ?>
 
 	sql_db          = <?php echo $c->db; ?>
 
-	sql_port        = 3306	# optional, default is 3306
+	sql_port        = 3306	# Actually, this isn't set dynamically yet, override this if you know better
 
 	sql_query_range	= SELECT MIN( ID ), MAX( ID ) FROM wp_1_posts
 	sql_range_step = 1000

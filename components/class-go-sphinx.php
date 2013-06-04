@@ -7,6 +7,8 @@ class GO_Sphinx
 	public $client = FALSE;
 	public $test = FALSE;
 
+	public $admin_cap = 'manage_options';
+
 	public function __construct()
 	{
 		// the admin settings page
@@ -27,24 +29,24 @@ class GO_Sphinx
 		return $this->admin;
 	}
 
-	public function client( $config )
+	public function client( $config = array() )
 	{
-		if ( ! $this->client )
+		if ( ! $this->client || ! empty( $config ) )
 		{
-			require_once __DIR__ . '/externals/sphinx.php';
+			require_once __DIR__ . '/externals/sphinxapi.php';
 			$this->client = new SphinxClient();
+
+			$config = wp_parse_args( $config, apply_filters( 'go_config', array(
+				'server'      => 'localhost',
+				'port'        => 9312,
+				'timeout'     => 1,
+				'arrayresult' => TRUE,
+			), 'go-sphinx' ) );
+
+			$this->client->SetServer( $config['server'], $config['port'] );
+			$this->client->SetConnectTimeout( $config['timeout'] );
+			$this->client->SetArrayResult( $config['arrayresult'] );
 		}
-
-		$config = wp_parse_args( $config, apply_filters( 'go_config', array(
-			'server'      => 'localhost',
-			'port'        => 9312,
-			'timeout'     => 1,
-			'arrayresult' => TRUE,
-		), 'go-sphinx' ) );
-
-		$this->client->SetServer( $config['host'], $config['port'] );
-		$this->client->SetConnectTimeout( $config['timeout'] );
-		$this->client->SetArrayResult( $config['arrayresult'] );
 
 		return $this->client;
 	}

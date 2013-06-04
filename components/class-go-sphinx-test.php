@@ -10,10 +10,12 @@ class GO_Sphinx_Test extends GO_Sphinx
 	public function search_test()
 	{
 		// permissions check
-		if( ! current_user_can( 'activate_plugins' ))
+		if( ! current_user_can( $this->admin_cap ))
 		{
-			die(0);
+			wp_die();
 		}
+
+print_r( go_sphinx()->client() );
 
 		die;
 	}

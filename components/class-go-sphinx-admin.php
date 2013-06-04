@@ -2,8 +2,6 @@
 
 class GO_Sphinx_Admin extends GO_Sphinx
 {
-	public $options_cap = 'manage_options';
-
 	public function __construct()
 	{
 		add_action( 'admin_menu', array( $this, 'admin_menu' ) );
@@ -14,7 +12,7 @@ class GO_Sphinx_Admin extends GO_Sphinx
 	public function admin_init()
 	{
 		// load the test suite if the user has permissions
-		if( current_user_can( $this->options_cap ))
+		if( current_user_can( $this->admin_cap ))
 		{
 			$this->test();
 		}
@@ -22,7 +20,7 @@ class GO_Sphinx_Admin extends GO_Sphinx
 
 	public function admin_menu()
 	{
-		add_submenu_page( 'options-general.php', 'Sphinx Configuration', 'Sphinx' , $this->options_cap , 'go-sphinx' , array( $this, 'config_page' ) );
+		add_submenu_page( 'options-general.php', 'Sphinx Configuration', 'Sphinx' , $this->admin_cap , 'go-sphinx' , array( $this, 'config_page' ) );
 	}
 
 	public function plugin_action_links( $actions )
