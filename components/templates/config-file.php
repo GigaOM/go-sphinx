@@ -13,7 +13,8 @@ source <?php echo $c->name; ?>
 
 	sql_port        = 3306	# Actually, this isn't set dynamically yet, override this if you know better
 
-	sql_query_range	= SELECT MIN( ID ), MAX( ID ) FROM wp_1_posts
+	sql_query_range	= SELECT MIN( ID ), MAX( ID ) FROM <?php echo $c->posts_table; ?>
+
 	sql_range_step = 1000
 	sql_query = \
 		SELECT \

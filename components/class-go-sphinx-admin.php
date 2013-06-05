@@ -39,7 +39,7 @@ class GO_Sphinx_Admin extends GO_Sphinx
 
 		global $wpdb;
 		$c = (object) array(
-			'name'   => rtrim( $wpdb->prefix, '_' ),
+			'name'   => $wpdb->posts,
 			'host'   => $wpdb->dbhost,
 			'user'   => $wpdb->dbuser,
 			'pass'   => $wpdb->dbpassword,
