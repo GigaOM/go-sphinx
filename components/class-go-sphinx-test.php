@@ -44,10 +44,36 @@ class GO_Sphinx_Test extends GO_Sphinx
 
 	public function sphinx_ten_most_recent_posts()
 	{
-		echo "Sphinx query of ten most recent posts:\n\n";
+		echo "\n---\nSphinx query of ten most recent posts:\n\n";
 
 		$client = $this->client();
-		//$client->SetLimits( 0, 10 )
+		$client->SetLimits( 0, 1000, 1000 );
+		$client->SetSortMode( SPH_SORT_EXTENDED, 'post_date_gmt DESC' );
+		//$client->SetMatchMode( SPH_MATCH_EXTENDED );
+		$res = $client->Query();
+		$hits = 0;
+		if ( FALSE !== $res )
+		{
+			foreach( $res['matches'] as $match )
+			{
+				if ( 'publish' != $match['attrs']['post_status'] )
+				{
+					continue;
+				}
+				echo $match['id'] . ', ' . $match['attrs']['post_status'] . ': ' . $match['attrs']['post_date_gmt'] . "\n";
+				$hits ++;
+				if ( 10 == $hits )
+				{
+					break;
+				}
+			}
+		}
+		else
+		{
+			echo "query error!\n";
+			print_r( $client->GetLastError() );
+			echo "\n\n";
+		}
 		//echo implode( ', ', $query->posts ) . "\n\n";
 		echo "done.\n";
 	}
