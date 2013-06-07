@@ -38,6 +38,11 @@ class GO_Sphinx_Test extends GO_Sphinx
 		++$test_count;
 		$this->most_recent_by_two_terms_test( 10 );
 
+
+		// invoke all tests in GO_Sphinx_Test2 from one function for
+		// easier merge later
+		$this->group_2_tests();
+
 		echo "</pre>\n";
 		die;
 	}
@@ -370,6 +375,23 @@ class GO_Sphinx_Test extends GO_Sphinx
 	{
 		$results_diff = array_diff( $wpq_results, $spx_results );
 		echo 'WP_Query and Sphinx results ' . ( empty( $results_diff ) ? '' : 'DO NOT ' ) . "match\n\n";
+	}
+
+	/**
+	 * run all tests from GO_Sphinx_Test2 from this function.
+	 */
+	public function group_2_tests()
+	{
+		// here's an example of invoking test functions in GO_Sphinx_Test2
+		// via a virtual function in this class. make sure the function has
+		// the same signature in both GO_Sphinx_Test (this class) and
+		// GO_Sphinx_Test2 (the subclass).
+		$this->test_6();
+	}
+
+	public function test_6()
+	{
+		// virtual
 	}
 
 }//END GO_Sphinx_Test
