@@ -20,15 +20,23 @@ class GO_Sphinx_Test extends GO_Sphinx
 		}
 
 		echo "<pre>\n";
+		$test_count = 1;
 
-		echo "1.\n";
+		echo "$test_count.\n";
+		++$test_count;
 		$this->ten_most_recent_posts_test();
 
-		echo "2.\n";
-		$this->most_recent_by_term_test( 10 );
+		echo "$test_count.\n";
+		++$test_count;
+		$this->most_recent_by_terms_test( 10 );
 
-		echo "3.\n";
-		$this->most_recent_by_term_test( 53 );
+		echo "$test_count.\n";
+		++$test_count;
+		$this->most_recent_by_terms_test( 53 );
+
+		echo "$test_count.\n";
+		++$test_count;
+		$this->most_recent_by_two_terms_test( 10 );
 
 		echo "</pre>\n";
 		die;
@@ -55,35 +63,76 @@ class GO_Sphinx_Test extends GO_Sphinx
 	 * do a query for posts that have that term; The exemplar post from #1
 	 * should be returned in this query."
 	 *
-	 * "Repeat the query from #2, but change the posts_per_page value to 53.
-	 * The query should return up to 53 posts; the MySQL and Sphinx results
-	 * should be indistinguishable."
+	 * "3. Repeat the query from #2, but change the posts_per_page value to
+	 * 53. The query should return up to 53 posts; the MySQL and Sphinx
+	 * results should be indistinguishable."
 	 */
-	public function most_recent_by_term_test( $num_posts )
+	public function most_recent_by_terms_test( $num_posts )
 	{
-		if ( FALSE === ( $result = $this->get_most_used_term( $this->ten_most_recent_hits_wp ) ) )
+		$terms = $this->get_most_used_terms( $this->ten_most_recent_hits_wp );
+		if ( empty( $terms ) )
 		{
 			echo "no term found for most recent posts by term tests\n\n";
 			return;
 		}
-		$wpq_results = $this->wp_query_most_recent_by_term( $result['term'], $num_posts );
-		if ( $wpq_results && in_array( $result['post_id'], $wpq_results ) )
+		$wpq_results = $this->wp_query_most_recent_by_terms( $terms[0]['term'], $num_posts );
+		if ( $wpq_results && in_array( $terms[0]['post_id'], $wpq_results ) )
 		{
-			echo 'source post (' . $result['post_id'] . ") found\n\n";
+			echo 'source post (' . $terms[0]['post_id'] . ") found\n\n";
 		}
 		else
 		{
-			echo 'source post (' . $result['post_id'] . ") NOT found\n\n";
+			echo 'source post (' . $terms[0]['post_id'] . ") NOT found\n\n";
 		}
 
-		$spx_results = $this->sphinx_most_recent_by_term( $result['term'], $num_posts );
-		if ( $spx_results && in_array( $result['post_id'], $spx_results ) )
+		$spx_results = $this->sphinx_most_recent_by_terms( $terms[0]['term'], $num_posts );
+		if ( $spx_results && in_array( $terms[0]['post_id'], $spx_results ) )
 		{
-			echo 'source post (' . $result['post_id'] . ") found\n\n";
+			echo 'source post (' . $terms[0]['post_id'] . ") found\n\n";
 		}
 		else
 		{
-			echo 'source post (' . $result['post_id'] . ") NOT found\n\n";
+			echo 'source post (' . $terms[0]['post_id'] . ") NOT found\n\n";
+		}
+
+		$this->compare_results( $wpq_results, $spx_results );
+
+		echo "---\n\n";
+	}
+
+	/**
+	 * "4. Using the same post from #1, pick the most frequently used two
+	 * terms on that post and do a new query for posts with those terms.
+	 * The exemplar post from #1 should be returned in this query."
+	 */
+	public function most_recent_by_two_terms_test()
+	{
+		$terms = $this->get_most_used_terms( $this->ten_most_recent_hits_wp, 2 );
+		if ( empty( $terms ) )
+		{
+			echo "no term found for most recent posts by term tests\n\n";
+			return;
+		}
+
+		$term_objs = array( $terms[0]['term'], $terms[1]['term'] );
+		$wpq_results = $this->wp_query_most_recent_by_terms( $term_objs, 10 );
+		if ( $wpq_results && in_array( $terms[0]['post_id'], $wpq_results ) )
+		{
+			echo 'source post (' . $terms[0]['post_id'] . ") found\n\n";
+		}
+		else
+		{
+			echo 'source post (' . $terms[0]['post_id'] . ") NOT found\n\n";
+		}
+
+		$spx_results = $this->sphinx_most_recent_by_terms( $term_objs, 10 );
+		if ( $spx_results && in_array( $terms[0]['post_id'], $spx_results ) )
+		{
+			echo 'source post (' . $terms[0]['post_id'] . ") found\n\n";
+		}
+		else
+		{
+			echo 'source post (' . $terms[0]['post_id'] . ") NOT found\n\n";
 		}
 
 		$this->compare_results( $wpq_results, $spx_results );
@@ -158,10 +207,14 @@ class GO_Sphinx_Test extends GO_Sphinx
 		}
 	}
 
-	// find the most frequently used term in the first post in $posts
-	// that contains any taxonomy. return a term object or FALSE if
-	// not found.
-	public function get_most_used_term( $posts )
+	/**
+	 * find the most frequently used terms in the first post in $posts
+	 * that contains any taxonomy. return an array of term objects or
+	 * FALSE if not found.
+	 * @param $min_terms minimum number of terms a post must have before
+	 *  we return the terms.
+	 */
+	public function get_most_used_terms( $posts, $min_terms = 1 )
 	{
 		$post_id = FALSE;    // set to first post with any taxonomy
 		$taxonomies = FALSE; // taxonomies associated with $post_id
@@ -172,35 +225,65 @@ class GO_Sphinx_Test extends GO_Sphinx
 			if ( ! empty( $taxonomies ) )
 			{
 				$post_id = $post->ID;
-				break;
-			}
-		}
 
-		$terms = wp_get_object_terms( $post_id, $taxonomies, array(
-										  'orderby' => 'count',
-										  'order'   => 'DESC',
-									) );
-		if ( is_wp_error( $terms ) )
-		{
-			print_r( $terms ) . "\n\n";
-			return FALSE;
+				$terms = wp_get_object_terms( $post_id, $taxonomies, array(
+												  'orderby' => 'count',
+												  'order'   => 'DESC',
+											) );
+				if ( is_wp_error( $terms ) )
+				{
+					print_r( $terms ) . "\n\n";
+					return FALSE;
+				}
+
+				if ( count( $terms ) >= $min_terms )
+				{
+					break;
+				}
+			}
 		}
 
 		// order = DESC seems to list count of 0 first so we have to
 		// make sure to skip posts with count of 0
+		$results = array();
 		foreach( $terms as $term )
 		{
 			if ( $term->count != 0 )
 			{
-				return array( 'post_id' => $post_id, 'term' => $term );
+				$results[] = array( 'post_id' => $post_id, 'term' => $term );
 			}
 		}
-		return FALSE;
+		return $results;
 	}
 
-	public function wp_query_most_recent_by_term( $term, $num_results )
+	public function wp_query_most_recent_by_terms( $terms, $num_results )
 	{
-		echo "WP_Query of ten most recent posts with ttid $term->term_taxonomy_id:\n\n";
+		if ( is_array( $terms ) )
+		{
+			$tax_query = array( 'relation' => 'AND' );
+			$ttids = array();
+			foreach( $terms as $term )
+			{
+				$tax_query[] = array(
+					'taxonomy' => $term->taxonomy,
+					'field' => 'id',
+					'terms' => $term->term_id,
+					'operator' => 'IN',
+					);
+				$ttids[] = $term->term_taxonomy_id;
+			}
+		}
+		else
+		{
+			// in this case $terms is just a single term object
+			$tax_query = array( array(
+								'taxonomy' => $terms->taxonomy,
+								'field' => 'id',
+								'terms' => $terms->term_id,
+								) );
+			$ttids = array( $terms->term_taxonomy_id );
+		}
+		echo "WP_Query of $num_results most recent posts with ttid(s) " . implode( ', ', $ttids ) . ":\n\n";
 
 		$results = new WP_Query(
 			array(
@@ -209,13 +292,8 @@ class GO_Sphinx_Test extends GO_Sphinx
 				'posts_per_page' => $num_results,
 				'orderby'        => 'date',
 				'order'          => 'DESC',
-				'tax_query'      => array(
-					array(
-						'taxonomy' => $term->taxonomy,
-						'field' => 'id',
-						'terms' => $term->term_id,
-						) )
-		) );
+				'tax_query'      => $tax_query,
+				) );
 
 		if ( empty( $results->posts ) )
 		{
@@ -233,15 +311,39 @@ class GO_Sphinx_Test extends GO_Sphinx
 		return $ids;
 	}
 
-	public function sphinx_most_recent_by_term( $term, $num_results )
+	public function sphinx_most_recent_by_terms( $terms, $num_results )
 	{
-		echo "\nSphinx query of ten most recent posts with ttid $term->term_taxonomy_id:\n\n";
-
 		$client = $this->client();
+		$ttids = array();
+
+		if ( is_array( $terms ) )
+		{
+			foreach( $terms as $term )
+			{
+				$ttids[] = $term->term_taxonomy_id;
+
+				// calling SetFilter() on an array of tt_ids differs
+				// semantically than calling SetFilter() once on each
+				// tt_id to be filtered. SetFilter() on all the tt_ids means
+				// a document only has to match any of the tt_ids in the array
+				// (OR), whereas calling SetFilter() once for each tt_id means
+				// the docuemnt must match all tt_ids (AND). here we want
+				// documents that match all terms passed in so we need to
+				// call SetFilter() once on each term/tt_id.
+				$client->SetFilter( 'tt_id', array( $term->term_taxonomy_id ) );
+			}
+		}
+		else
+		{
+			$ttids[] = $terms->term_taxonomy_id;
+			$client->SetFilter( 'tt_id', array( $terms->term_taxonomy_id ) );
+		}
+
+		echo "\nSphinx query of $num_results most recent posts with ttid(s) " . implode( ', ', $ttids ) . ":\n\n";
+
 		$client->SetLimits( 0, $num_results, 1000 );
 		$client->SetSortMode( SPH_SORT_EXTENDED, 'post_date_gmt DESC' );
 		$client->SetMatchMode( SPH_MATCH_EXTENDED );
-		$client->SetFilter( 'tt_id', array( $term->term_taxonomy_id ) );
 		$results = $client->Query( '@post_status publish' );
 
 		if ( FALSE === $results )
