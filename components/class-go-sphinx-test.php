@@ -36,8 +36,11 @@ class GO_Sphinx_Test extends GO_Sphinx
 
 		echo "$test_count.\n";
 		++$test_count;
-		$this->most_recent_by_two_terms_test( 10 );
+		$this->most_recent_by_two_terms_test();
 
+		echo "$test_count.\n";
+		++$test_count;
+		$this->most_recent_by_two_terms_paged_test();
 
 		// invoke all tests in GO_Sphinx_Test2 from one function for
 		// easier merge later
@@ -139,6 +142,32 @@ class GO_Sphinx_Test extends GO_Sphinx
 		{
 			echo 'source post (' . $terms[0]['post_id'] . ") NOT found\n\n";
 		}
+
+		$this->compare_results( $wpq_results, $spx_results );
+
+		echo "---\n\n";
+	}
+
+	/**
+	 * "5. Repeat the query from #4, but change the posts_per_page value to
+	 *  3 and paged to 3. The query should return up to 3 posts starting
+	 *  with the last post returned in #4; the MySQL and Sphinx results 
+	 *  should be indistinguishable."
+	 */
+	public function most_recent_by_two_terms_paged_test()
+	{
+		$terms = $this->get_most_used_terms( $this->ten_most_recent_hits_wp, 2 );
+		if ( empty( $terms ) )
+		{
+			echo "no term found for most recent posts by term tests\n\n";
+			return;
+		}
+
+		$term_objs = array( $terms[0]['term'], $terms[1]['term'] );
+
+		$wpq_results = $this->wp_query_most_recent_by_terms( $term_objs, 3, 4 );
+
+		$spx_results = $this->sphinx_most_recent_by_terms( $term_objs, 3, 4 );
 
 		$this->compare_results( $wpq_results, $spx_results );
 
@@ -261,7 +290,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 		return $results;
 	}
 
-	public function wp_query_most_recent_by_terms( $terms, $num_results )
+	public function wp_query_most_recent_by_terms( $terms, $num_results, $page_num = FALSE )
 	{
 		if ( is_array( $terms ) )
 		{
@@ -288,17 +317,34 @@ class GO_Sphinx_Test extends GO_Sphinx
 								) );
 			$ttids = array( $terms->term_taxonomy_id );
 		}
-		echo "WP_Query of $num_results most recent posts with ttid(s) " . implode( ', ', $ttids ) . ":\n\n";
 
-		$results = new WP_Query(
-			array(
-				'post_type'      => 'any',
-				'post_status'    => 'publish',
-				'posts_per_page' => $num_results,
-				'orderby'        => 'date',
-				'order'          => 'DESC',
-				'tax_query'      => $tax_query,
-				) );
+		// pages start at 1
+		if ( $page_num === 0 )
+		{
+			$page_num = 1;
+		}
+		if ( $page_num !== FALSE )
+		{
+			echo "WP_Query of $num_results posts on page $page_num of most recent posts with ttid(s) " . implode( ', ', $ttids ) . ":\n\n";
+		}
+		else
+		{
+			echo "WP_Query of $num_results most recent posts with ttid(s) " . implode( ', ', $ttids ) . ":\n\n";
+		}
+
+		$query_arg = array(
+			'post_type'      => 'any',
+			'post_status'    => 'publish',
+			'posts_per_page' => $num_results,
+			'orderby'        => 'date',
+			'order'          => 'DESC',
+			'tax_query'      => $tax_query,
+			);
+		if ( $page_num !== FALSE )
+		{
+			$query_arg['paged'] = $page_num;
+		}
+		$results = new WP_Query( $query_arg );
 
 		if ( empty( $results->posts ) )
 		{
@@ -316,7 +362,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 		return $ids;
 	}
 
-	public function sphinx_most_recent_by_terms( $terms, $num_results )
+	public function sphinx_most_recent_by_terms( $terms, $num_results, $page_num = FALSE )
 	{
 		$client = $this->client();
 		$ttids = array();
@@ -344,9 +390,23 @@ class GO_Sphinx_Test extends GO_Sphinx
 			$client->SetFilter( 'tt_id', array( $terms->term_taxonomy_id ) );
 		}
 
-		echo "\nSphinx query of $num_results most recent posts with ttid(s) " . implode( ', ', $ttids ) . ":\n\n";
+		// pages start at 1
+		if ( $page_num === 0 )
+		{
+			$page_num = 1;
+		}
+		if ( $page_num !== FALSE )
+		{
+			echo "\nSphinx query of $num_results posts on page $page_num of most recent posts with ttid(s) " . implode( ', ', $ttids ) . ":\n\n";
+			$offset = ( $page_num - 1 ) * $num_results;
+		}
+		else
+		{
+			echo "\nSphinx query of $num_results most recent posts with ttid(s) " . implode( ', ', $ttids ) . ":\n\n";
+			$offset = 0;
+		}
 
-		$client->SetLimits( 0, $num_results, 1000 );
+		$client->SetLimits( $offset, $num_results, 1000 );
 		$client->SetSortMode( SPH_SORT_EXTENDED, 'post_date_gmt DESC' );
 		$client->SetMatchMode( SPH_MATCH_EXTENDED );
 		$results = $client->Query( '@post_status publish' );
@@ -373,7 +433,15 @@ class GO_Sphinx_Test extends GO_Sphinx
 	// compare wpq and spx results
 	public function compare_results( $wpq_results, $spx_results )
 	{
-		$results_diff = array_diff( $wpq_results, $spx_results );
+		if ( count( $wpq_results ) > count( $spx_results ) )
+		{
+			$results_diff = array_diff( $wpq_results, $spx_results );
+		}
+		else
+		{
+			$results_diff = array_diff( $spx_results, $wpq_results );
+		}
+
 		echo 'WP_Query and Sphinx results ' . ( empty( $results_diff ) ? '' : 'DO NOT ' ) . "match\n\n";
 	}
 
