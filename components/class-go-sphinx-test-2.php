@@ -11,115 +11,112 @@ class GO_Sphinx_Test2 extends GO_Sphinx_Test
 	}
 
 	// virtual from GO_Sphinx_Test
-	public function test_6()
+	public function mutually_exclusive_posts_test()
 	{
-		echo "\nTest #6!\n\n---\n\n";
-		$results = $this->setup_test_6( $results );
-		$wpq_results = $this->WP_test_6( $results );
-		$spx_results = $this->SP_test_6( $results );
-		$this->compare_results( $wpq_results, $spx_results );
+		echo "$this->test_count.\n";
+		$query_terms = $this->setup_mutually_exclusive_posts_test( $results );
+		$this->WP_mutually_exclusive_posts_test( $query_terms, FALSE );
+		$this->SP_mutually_exclusive_posts_test( $query_terms, FALSE );
 		echo "---\n\n";
-	}		
+		++$this->test_count;
+	}//END mutually_exclusive_posts_test
 
-	public function setup_test_6()
-	{		
-		echo "\nSetup Test #6!\n\n---\n\n";
-		//wp_dbug($this->ten_most_recent_hits_wp);
-		//echo "<hr>";
-		//wp_dbug($this->ten_most_recent_hits_spx);
-		
-		foreach ( $this->ten_most_recent_hits_wp as $post ) 
+	// find the two posts with terms that're not in any other posts
+	public function setup_mutually_exclusive_posts_test()
+	{
+		$post_ids_to_terms = array();
+		foreach ( $this->ten_most_recent_hits_wp as $post )
 		{
 			$post_ids_to_terms[ $post->ID ] = $this->get_most_used_terms( array($post) );
 		}
-			
-		//wp_dbug( $post_ids_to_terms );
-		
-		$subset_post_ids_to_terms = array();
-		$term_ids_to_str = array();			
-		
+
+		$post_ids_to_ttids = array(); // maps post ids to ttid lists
+		$ttids_to_terms = array();    // maps ttids to term objects
+
 		foreach ( $post_ids_to_terms as $post_id => $terms_list ) 
 		{
-			// echo ($post_id);
-			// echo "\n";
-			$term_ids = array();
-			foreach ($terms_list as $elem) {
-				//echo $elem['term']->term_id;
-				//echo "\n";
-				$term_ids[] = $elem['term']->term_taxonomy_id;
-				$term_ids_to_str[ $elem['term']->term_taxonomy_id ] = $elem['term'];
-			}
-			
-			$subset_post_ids_to_terms[ $post_id ] = $term_ids;
-		}
-		
-		//wp_dbug($post_ids_to_terms);
-		//wp_dbug($term_ids_to_str);
-		
-		$results = array();
-		
-		foreach ( $subset_post_ids_to_terms as $post_id => $ttid_list ) 
-		{
-			foreach ( $ttid_list as $ttid ) 
+			$ttids = array();
+			foreach ($terms_list as $term_obj)
 			{
-				if ( !$this->is_ttid_in_array( $subset_post_ids_to_terms, $post_id, $ttid ) )
-				{
-					$results[ $post_id ] =  $term_ids_to_str[ $ttid ];
-					
-					if ( 2 <= count( $results ) ) 
-					{
-						break;
-					}
-						 
-				}				
+				$ttids[] = $term_obj['term']->term_taxonomy_id;
+				$ttids_to_terms[ $term_obj['term']->term_taxonomy_id ] = $term_obj['term'];
 			}
-			if ( 2 <= count( $results ) ) 
+
+			$post_ids_to_ttids[ $post_id ] = $ttids;
+		}
+
+		// now look for two posts and a term in each post that only appears
+		// in that post.
+		$query_terms = array();
+		foreach ( $post_ids_to_ttids as $post_id => $ttid_list )
+		{
+			foreach ( $ttid_list as $ttid )
+			{
+				if ( ! $this->is_ttid_in_array( $post_ids_to_ttids, $post_id, $ttid ) )
+				{
+					$query_terms[ $post_id ] =  $ttids_to_terms[ $ttid ];
+
+					if ( 2 <= count( $query_terms ) )
+					{
+						break; // we found enough results
+					}
+				}
+			}
+			if ( 2 <= count( $query_terms ) ) 
 			{
 				break;
 			}
 		}
-		
-		return $results;
-	} //END setup_test_6
-		
-	public function WP_test_6( $results )
+
+		return $query_terms;
+	} //END setup_mutually_exclusive_posts_test
+
+	/**
+	 * @param $query_terms array of post id mapped to term objects to search
+	 * @param $is_IN_test whether to use the "IN" (OR) test or not.
+	 */		
+	public function WP_mutually_exclusive_posts_test( $query_terms, $is_IN_test )
 	{
-		echo "\nWP Test #6!\n\n---\n\n";
-		$tax_query = array( 'relation' => 'AND' );
-		foreach( $results as $term )
+		$tax_query = $is_IN_test ? array( 'relation' => 'OR' ) : array( 'relation' => 'AND' );
+		foreach( $query_terms as $term )
 		{
 			$tax_query[] = array(
 				'taxonomy' => $term->taxonomy,
-				'field' => 'id',
-				'terms' => $term->term_id,
+				'field'    => 'id',
+				'terms'	   => $term->term_id,
 				);
 		}
-		
-		$query_arg = array(
-			'fields'		=> 'ids',
-			'post_type'      => 'any',
-			'post_status'    => 'publish',
-			'posts_per_page' => 10,
-			'orderby'        => 'date',
-			'order'          => 'DESC',
-			'tax_query'      => $tax_query,
-			);
-		$query_results = new WP_Query( $query_arg );	
-		
-		//WP_DBug( $query_results->posts );
-		
+
+		$query_results = new WP_Query(
+			array(
+				'fields'         => 'ids',
+				'post_type'      => 'any',
+				'post_status'    => 'publish',
+				'posts_per_page' => 10,
+				'orderby'        => 'date',
+				'order'          => 'DESC',
+				'tax_query'      => $tax_query,
+				) );
+
+		// make sure keys from $query_terms are not in $query_results...
 		$test_failed = FALSE;
-		foreach ( $results as $post_id => $term_obj ) {
-			if ( in_array( $post_id, $query_results->posts ) )
+		foreach ( $query_terms as $post_id => $term_obj )
+		{
+			if ( ( in_array( $post_id, $query_results->posts ) && ! $is_IN_test ) ||
+				 ( ! in_array( $post_id, $query_results->posts ) && $is_IN_test ) )
 			{
+				// we shouldn't find any post from $query_terms in the search
+				// results when not performing the "IN" test,
+				// and we should find all posts from $query_terms in the search
+				// results when performing the "IN" test
 				$test_failed = TRUE;
 				break;
 			}
 		}
-		// make sure keys from $results are not in $query_results...
-		echo ( $test_failed ) ? "FAILED" : "PASSED"; 
-	} // END WP_test_6
-	
+
+		echo 'WP_Query() for test ' . $this->test_count . ' ' . ( ( $test_failed ) ? "FAILED" : "PASSED" ) . ".\n\n";
+	} // END setup_mutually_exclusive_posts_test
+
 	public function is_ttid_in_array($post_ids, $post_to_ignore, $ttid)
 	{
 		foreach ( $post_ids as $post_id => $ttid_list ) 
@@ -127,59 +124,82 @@ class GO_Sphinx_Test2 extends GO_Sphinx_Test
 			if ( $post_id == $post_to_ignore ) continue;
 			if ( in_array($ttid, $ttid_list) )
 			{
-				return true;
+				return TRUE;
 			}
 		}
 		
-		return false;
+		return FALSE;
 	} // END is_ttid_in_array
 	
-	
-	public function SP_test_6( $terms_objects )
+	/**
+	 * @param $query_terms array of post id mapped to term objects to search
+	 * @param $is_IN_test whether to use the "IN" (OR) test or not.
+	 */		
+	public function SP_mutually_exclusive_posts_test( $query_terms, $is_IN_test )
 	{
-		echo "\nWP Test #6!\n\n---\n\n";
-		
 		$client = $this->client();
 
 		$ttids = array();
-		foreach( $terms_objects as $term )
+		foreach( $query_terms as $term )
 		{
-			// calling SetFilter() on an array of tt_ids differs
-			// semantically than calling SetFilter() once on each
-			// tt_id to be filtered. SetFilter() on all the tt_ids means
-			// a document only has to match any of the tt_ids in the array
-			// (OR), whereas calling SetFilter() once for each tt_id means
-			// the docuemnt must match all tt_ids (AND). here we want
-			// documents that match all terms passed in so we need to
-			// call SetFilter() once on each term/tt_id.
+			// set a filter for each ttid to filter to get the AND behavior
 			$client->SetFilter( 'tt_id', array( $term->term_taxonomy_id ) );
-		}			
+		}
 
 		$client->SetLimits( 0, 10, 1000 );
 		$client->SetSortMode( SPH_SORT_EXTENDED, 'post_date_gmt DESC' );
 		$client->SetMatchMode( SPH_MATCH_EXTENDED );
 		$results = $client->Query( '@post_status publish' );
-		
+
 		if ( FALSE === $results )
 		{
 			echo "query error: ";
 			print_r( $client->GetLastError() );
 			echo "\n\n";
-			return FALSE;
+			return;
 		}
-		
+
+		$matched_post_ids = array();
+		if ( isset( $results['matches'] ) )
+		{
+			foreach( $results['matches'] as $match )
+			{
+				$matched_post_ids[] = $match['id'];
+			}
+		}
+
 		// make sure keys from $results are not in $terms...
 		$test_failed = FALSE;
-		foreach ( $terms_objects as $post_id ) 
+		foreach ( $query_terms as $post_id => $term_obj )
 		{
-			if ( in_array( $post_id, $results ) )
+			if ( ( in_array( $post_id, $matched_post_ids ) && ! $is_IN_test ) ||
+				 ( ! in_array( $post_id, $matched_post_ids ) && $is_IN_test ) )
 			{
+				// we shouldn't find any post from $query_terms in the search
+				// results when not performing the "IN" test,
+				// and we should find all posts from $query_terms in the search
+				// results when performing the "IN" test
 				$test_failed = TRUE;
 				break;
 			}
 		}
-		echo ( $test_failed ) ? "FAILED \n" : "PASSED \n"; 		
+
+		echo 'Sphinx query for test ' . $this->test_count . ' ' . ( ( $test_failed ) ? "FAILED" : "PASSED" ) . ".\n\n";
 		
-	}//END SP_test_6
+	}//END SP_mutually_exclusive_posts_test
+
+
+	// virtual from GO_Sphinx_Test
+	public function mutually_exclusive_posts_IN_test()
+	{
+		echo "$this->test_count.\n";
+
+		$query_terms = $this->setup_mutually_exclusive_posts_test( $results );
+
+		$this->WP_mutually_exclusive_posts_test( $query_terms, TRUE );
+		$this->SP_mutually_exclusive_posts_test( $query_terms );
+		echo "---\n\n";
+		++$this->test_count;
+	}//END mutually_exclusive_posts_IN_test
 
 }//END GO_Sphinx_Test2

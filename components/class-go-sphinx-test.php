@@ -5,6 +5,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 	public $ten_most_recent_hits_wp  = FALSE;
 	public $ten_most_recent_hits_spx = FALSE;
 	public $taxonomies = FALSE; // all taxonomies in the system
+	public $test_count = 1;
 
 	public function __construct()
 	{
@@ -20,35 +21,33 @@ class GO_Sphinx_Test extends GO_Sphinx
 		}
 
 		echo "<pre>\n";
-		$test_count = 1;
 
-		echo "$test_count.\n";
-		++$test_count;
+		echo "$this->test_count.\n";
+		++$this->test_count;
 		$this->ten_most_recent_posts_test();
 
-		echo "$test_count.\n";
-		++$test_count;
+		echo "$this->test_count.\n";
+		++$this->test_count;
 		$this->most_recent_by_terms_test( 10 );
 
-		echo "$test_count.\n";
-		++$test_count;
+		echo "$this->test_count.\n";
+		++$this->test_count;
 		$this->most_recent_by_terms_test( 53 );
 
-		echo "$test_count.\n";
-		++$test_count;
+		echo "$this->test_count.\n";
+		++$this->test_count;
 		$this->most_recent_by_two_terms_test();
 
-		echo "$test_count.\n";
-		++$test_count;
+		echo "$this->test_count.\n";
+		++$this->test_count;
 		$this->most_recent_by_two_terms_paged_test();
 
 		// invoke all tests in GO_Sphinx_Test2 from one function for
 		// easier merge later
 		$this->group_2_tests();
 
-		$test_count = 8;
-		echo "$test_count.\n";
-		++$test_count;
+		echo "$this->test_count.\n";
+		++$this->test_count;
 		$this->most_recent_by_term_name_test();
 
 		echo "</pre>\n";
@@ -463,10 +462,17 @@ class GO_Sphinx_Test extends GO_Sphinx
 		// via a virtual function in this class. make sure the function has
 		// the same signature in both GO_Sphinx_Test (this class) and
 		// GO_Sphinx_Test2 (the subclass).
-		$this->test_6();
+		$this->mutually_exclusive_posts_test();
+
+		$this->mutually_exclusive_posts_IN_test();
 	}
 
-	public function test_6()
+	public function mutually_exclusive_posts_test()
+	{
+		// virtual
+	}
+
+	public function mutually_exclusive_posts_IN_test()
 	{
 		// virtual
 	}
