@@ -219,6 +219,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 	{
 		echo "\nSphinx query of ten most recent posts:\n\n";
 
+		$this->client = FALSE; // ensure we get a new instance
 		$client = $this->client();
 		$client->SetLimits( 0, 10, 1000 );
 		$client->SetSortMode( SPH_SORT_EXTENDED, 'post_date_gmt DESC' );
@@ -372,6 +373,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 
 	public function sphinx_most_recent_by_terms( $terms, $num_results, $page_num = FALSE )
 	{
+		$this->client = FALSE; // ensure we get a new instance
 		$client = $this->client();
 		$ttids = array();
 
@@ -502,19 +504,29 @@ class GO_Sphinx_Test extends GO_Sphinx
 				'orderby'        => 'date', // or 'modified'?
 				'order'          => 'DESC',
 				'fields'         => 'ids',
-				's'              => '"' . $term->name . '"',
+				/* 's'              => '"' . $term->name . '"', */
+				's'              => 'database',
 		) );
 
+		$this->client = FALSE; // ensure we get a new instance
 		$client = $this->client();
 		$client->SetLimits( 0, 10, 1000 );
-		$client->SetRankingMode( SPH_RANK_SPH04 );
-		$client->SetSortMode( SPH_SORT_EXTENDED, '@rank DESC, post_date_gmt DESC' );
+		//$client->SetRankingMode( SPH_RANK_SPH04 );
+		//$client->SetSortMode( SPH_SORT_EXTENDED, '@rank DESC, post_date_gmt DESC' );
+		$client->SetSortMode( SPH_SORT_EXTENDED, 'post_date_gmt DESC, @rank DESC' );
 		$client->SetMatchMode( SPH_MATCH_EXTENDED );
 		$spx_results = $client->Query( '"' . $term->name . '" @post_status publish' );
 
-		$spx_result_ids = array();
+		if ( FALSE === $spx_results )
+		{
+			echo "query error: ";
+			print_r( $client->GetLastError() );
+			echo "\n\n";
+			return;
+		}
 
-		if ( FALSE != $spx_results )
+		$spx_result_ids = array();
+		if ( isset( $spx_results['matches'] ) )
 		{
 			foreach( $spx_results['matches'] as $match )
 			{
@@ -522,5 +534,32 @@ class GO_Sphinx_Test extends GO_Sphinx
 			}
 		}
 
+		if ( count( $wpq_results->posts ) > count( $spx_result_ids ) )
+		{
+			$diff = array_diff( $wpq_results->posts, $spx_result_ids );
+			$source_len = count( $wpq_results->posts );
+		}
+		else
+		{
+			$diff = array_diff( $spx_result_ids, $wpq_results->posts );
+			$source_len = count( $spx_result_ids );
+		}
+
+		// our rough definition of similar: the difference should not be
+		// more than 1/3 of the length of the longer result array
+		// 
+		if ( count( $diff ) > ( $source_len / 3 ) )
+		{
+			echo 'test FAILED: WP_Query and Sphinx results differ by ' . count( $diff ) . " out of $source_len posts.\n\n" ;
+		}
+		else
+		{
+			echo "test PASSED.\n\n";
+		}
+		echo "WP_Query results:\n";
+		print_r( $wpq_results->posts );
+		echo "Sphinx results:\n";
+		print_r( $spx_result_ids );
+		echo "\n---\n\n";
 	}
 }//END GO_Sphinx_Test

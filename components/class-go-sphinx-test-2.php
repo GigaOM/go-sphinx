@@ -11,6 +11,12 @@ class GO_Sphinx_Test2 extends GO_Sphinx_Test
 	}
 
 	// virtual from GO_Sphinx_Test
+	/**
+	 * 6. Using the query from #1, pick two posts. Pick the most frequently
+	 * used term on each post that doesn’t appear on the other post. Do a
+	 * new AND query with those terms. Neither of the two exemplar posts
+	 * should be returned in the result.
+	 */
 	public function mutually_exclusive_posts_test()
 	{
 		echo "$this->test_count.\n";
@@ -137,6 +143,7 @@ class GO_Sphinx_Test2 extends GO_Sphinx_Test
 	 */		
 	public function SP_mutually_exclusive_posts_test( $query_terms, $is_IN_test )
 	{
+		$this->client = FALSE; // ensure we get a new instance
 		$client = $this->client();
 
 		$ttids = array();
@@ -190,6 +197,10 @@ class GO_Sphinx_Test2 extends GO_Sphinx_Test
 
 
 	// virtual from GO_Sphinx_Test
+	/**
+	 * 7. Using the terms from #6, do a new IN query with those terms.
+	 * Both the exemplar posts from #4 should appear in the results
+	 */
 	public function mutually_exclusive_posts_IN_test()
 	{
 		echo "$this->test_count.\n";
