@@ -46,6 +46,11 @@ class GO_Sphinx_Test extends GO_Sphinx
 		// easier merge later
 		$this->group_2_tests();
 
+		$test_count = 8;
+		echo "$test_count.\n";
+		++$test_count;
+		$this->most_recent_by_term_name_test();
+
 		echo "</pre>\n";
 		die;
 	}
@@ -290,7 +295,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 		return $results;
 	}
 
-	public function wp_query_most_recent_by_terms( $terms, $num_results, $page_num = FALSE )
+	public function wp_query_most_recent_by_terms( $terms, $num_results, $page_num = FALSE, $use_in_query = FALSE )
 	{
 		if ( is_array( $terms ) )
 		{
@@ -298,12 +303,16 @@ class GO_Sphinx_Test extends GO_Sphinx
 			$ttids = array();
 			foreach( $terms as $term )
 			{
-				$tax_query[] = array(
+				$query_arg = array(
 					'taxonomy' => $term->taxonomy,
 					'field' => 'id',
 					'terms' => $term->term_id,
-					'operator' => 'IN',
 					);
+				if ( $use_in_query )
+				{
+					$query_arg['operator'] = 'IN';
+				}
+				$tax_query[] = $query_arg;
 				$ttids[] = $term->term_taxonomy_id;
 			}
 		}
@@ -462,4 +471,50 @@ class GO_Sphinx_Test extends GO_Sphinx
 		// virtual
 	}
 
+	/**
+	 * "8. Using the term from #1, do a new query using the term name as the
+	 *  keyword search string. The MySQL and Sphinx results should be
+	 *  similar, though differences in sort order might be expected."
+	 */
+	public function most_recent_by_term_name_test()
+	{
+		$terms = $this->get_most_used_terms( $this->ten_most_recent_hits_wp );
+		if ( empty( $terms ) )
+		{
+			echo "no term found for most recent posts by term name test\n\n";
+			return;
+		}
+
+		$term = $terms[0]['term'];
+
+		// most recent ten hits, non-paged, using $term->name as a keyword
+		$wpq_results = new WP_Query(
+			array(
+				'post_type'      => 'any',
+				'post_status'    => 'publish',
+				'posts_per_page' => 10,
+				'orderby'        => 'date', // or 'modified'?
+				'order'          => 'DESC',
+				'fields'         => 'ids',
+				's'              => '"' . $term->name . '"',
+		) );
+
+		$client = $this->client();
+		$client->SetLimits( 0, 10, 1000 );
+		$client->SetRankingMode( SPH_RANK_SPH04 );
+		$client->SetSortMode( SPH_SORT_EXTENDED, '@rank DESC, post_date_gmt DESC' );
+		$client->SetMatchMode( SPH_MATCH_EXTENDED );
+		$spx_results = $client->Query( '"' . $term->name . '" @post_status publish' );
+
+		$spx_result_ids = array();
+
+		if ( FALSE != $spx_results )
+		{
+			foreach( $spx_results['matches'] as $match )
+			{
+				$spx_result_ids[] = $match['id'];
+			}
+		}
+
+	}
 }//END GO_Sphinx_Test
