@@ -224,6 +224,7 @@ class GO_Sphinx_Test2 extends GO_Sphinx_Test
 		echo "---\n\n";
 	}//END author_id_test	
 	
+	
 	public function wp_query_all_author_posts($author_id)
 	{
 		echo "WP_Query of all results for a given author" . '(' . $author_id . ')' . ":\n\n";
@@ -285,5 +286,87 @@ class GO_Sphinx_Test2 extends GO_Sphinx_Test
 			return FALSE;
 		}
 	}
+
+	
+	/**
+	 * 11. Using the posts from #1, repeat the query using the ID of the 3rd ordinal post as a post__in argument.
+	 * Only one post should be returned, it should match the post ID used as the post__in argument.
+	 */
+	public function post_in_test()
+	{
+		// get the ten most recent posts as in test #1.
+		$posts = $this->ten_most_recent_hits_wp;
+		if ( empty( $posts ) )
+		{
+			echo "no posts found \n\n";
+			return;
+		}
+		
+		//wp_dbug($posts);
+		$id_to_test = $posts[2]->ID;
+
+		$wpq_results = new WP_Query(
+			array(
+				'post_type'      => 'any',
+				'post_status'    => 'publish',
+				'posts_per_page' => 10,
+				'orderby'        => 'date', // or 'modified'?
+				'order'          => 'DESC',
+				'fields'         => 'ids',
+				'post__in'       => array($id_to_test),
+		) );
+		
+		if ( $wpq_results->post_count != 1 )
+		{
+			echo "did not find expected number of WP_Query results (1). FAILED\n\n";
+		}
+		else
+		{
+			if ( $wpq_results->posts[0] == $id_to_test )
+			{
+				echo "WP_Query results PASSED.\n\n";
+			}
+			else
+			{
+				echo "FAILED: unexpected id found in search results.\n\n";
+			}
+		}
+
+		// sphinx search
+		$this->client = FALSE; // ensure we get a new instance
+		$client = $this->client();
+		$client->SetLimits( 0, 10, 1000 );
+		$client->SetSortMode( SPH_SORT_EXTENDED, 'post_date_gmt DESC, @rank DESC' );
+		$client->SetMatchMode( SPH_MATCH_EXTENDED );
+		$client->SetFilter( '@id', array($id_to_test) );
+		$spx_results = $client->Query( '@post_status publish' );
+
+		if ( FALSE === $spx_results )
+		{
+			echo "query error: ";
+			print_r( $client->GetLastError() );
+			echo "\n---\n\n";
+			return;
+		}
+		
+		if ( 1 > count( $spx_results['matches'] ) )
+		{
+			echo "did not find expected number of Sphinx results (1). FAILED\n\n";
+		}
+		else
+		{
+			if ( $wpq_results->posts[0] == $id_to_test )
+			{
+				echo "Sphinx results PASSED.\n\n";
+			}
+			else
+			{
+				echo "FAILED: unexpected id found in search results.\n\n";
+			}
+		}
+
+		echo "---\n\n";
+
+	}//END post_in_test	
 
 }//END GO_Sphinx_Test2

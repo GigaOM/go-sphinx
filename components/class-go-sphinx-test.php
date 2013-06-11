@@ -61,6 +61,10 @@ class GO_Sphinx_Test extends GO_Sphinx
 		echo "$this->test_count.\n";
 		++$this->test_count;
 		$this->post_not_in_test();
+		
+		echo "$this->test_count.\n";
+		++$this->test_count;
+		$this->post_in_test();		
 
 		echo "</pre>\n";
 		die;
