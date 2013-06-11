@@ -50,6 +50,11 @@ class GO_Sphinx_Test extends GO_Sphinx
 		++$this->test_count;
 		$this->most_recent_by_term_name_test();
 
+		$this->test_count = 9;
+		echo "$this->test_count.\n";
+		++$this->test_count;
+		$this->post_not_in_test();
+
 		echo "</pre>\n";
 		die;
 	}
@@ -572,4 +577,101 @@ class GO_Sphinx_Test extends GO_Sphinx
 		}
 		echo "\n---\n\n";
 	}
+
+	/**
+	 * "10. Using the post IDs from #2, do a new query for the 10 most
+	 *  recent posts that excludes the post IDs from the earlier query
+	 *  using post__not_in. Both the MySQL and Sphinx results should
+	 *  exclude those posts.
+	 */
+	public function post_not_in_test()
+	{
+		// get the ten most recent posts as in test #2.
+		$terms = $this->get_most_used_terms( $this->ten_most_recent_hits_wp );
+		if ( empty( $terms ) )
+		{
+			echo "no term found for most recent posts by term tests\n\n";
+			return;
+		}
+
+		// find the posts to exclude from our search
+		$excluded_posts = $this->wp_query_most_recent_by_terms( $terms[0]['term'], 10 );
+		if ( 10 > count( $excluded_posts ) )
+		{
+			echo "could not find enough posts to exclude to complete the test\n\n";
+			return;
+		}
+
+		$wpq_results = new WP_Query(
+			array(
+				'post_type'      => 'any',
+				'post_status'    => 'publish',
+				'posts_per_page' => 10,
+				'orderby'        => 'date', // or 'modified'?
+				'order'          => 'DESC',
+				'fields'         => 'ids',
+				'post__not_in'   => $excluded_posts,
+		) );
+
+		if ( $wpq_results->post_count != 10 )
+		{
+			echo "did not find expected number of WP_Query results (10). FAILED\n\n";
+		}
+		else
+		{
+			$diff = array_diff( $wpq_results->posts, $excluded_posts );
+			if ( count( $diff ) == 10 )
+			{
+				echo "WP_Query results PASSED.\n\n";
+			}
+			else
+			{
+				echo "FAILED: some excluded posts were still found in search results.\n\n";
+			}
+		}
+
+		// sphinx search
+		$this->client = FALSE; // ensure we get a new instance
+		$client = $this->client();
+		$client->SetLimits( 0, 10, 1000 );
+		$client->SetSortMode( SPH_SORT_EXTENDED, 'post_date_gmt DESC, @rank DESC' );
+		$client->SetMatchMode( SPH_MATCH_EXTENDED );
+		$client->SetFilter( '@id', $excluded_posts, TRUE );
+		//$spx_results = $client->Query( '@!id ' . implode( ' ', $excluded_posts ) . ' @post_status publish' );
+		$spx_results = $client->Query( '@post_status publish' );
+
+		if ( FALSE === $spx_results )
+		{
+			echo "query error: ";
+			print_r( $client->GetLastError() );
+			echo "\n---\n\n";
+			return;
+		}
+
+		if ( 10 > count( $spx_results['matches'] ) )
+		{
+			echo "did not find expected number of Sphinx results (10). FAILED\n\n";
+		}
+		else
+		{
+			$matched_ids = array();
+			foreach( $spx_results['matches'] as $match )
+			{
+				$matched_ids[] = $match['id'];
+			}
+
+			$diff = array_diff( $matched_ids, $excluded_posts );
+			if ( count( $diff ) == 10 )
+			{
+				echo "Sphinx results PASSED.\n\n";
+			}
+			else
+			{
+				echo "FAILED: some excluded posts were still found in search results.\n\n";
+			}
+		}
+
+		echo "---\n\n";
+	}
+
 }//END GO_Sphinx_Test
