@@ -217,12 +217,80 @@ class GO_Sphinx_Test2 extends GO_Sphinx_Test
 	 * 9. Using the author ID from #1, do a new query for all results by that author
 	 * The MySQL and Sphinx results should be indistinguishable
 	 */
-	public function author_test()
+	public function author_id_test()
 	{
 		echo "$this->test_count.\n";
-
+		//	do the wp version . . .
+		echo "\n";
+		$wp_author_results = $this->wp_query_all_author_posts( $this->ten_most_recent_hits_wp[0]->post_author );
+		echo "\n";
+		//	do the sphinx version . . .
+		$sp_author_results = $this->sphinx_query_all_author_posts( $this->ten_most_recent_hits_spx[0]['attrs']['post_author'] );
+		$this->compare_results( $wpq_results, $spx_results );		
 		echo "---\n\n";
 		++$this->test_count;
-	}//END mutually_exclusive_posts_IN_test	
+	}//END author_id_test	
+	
+	public function wp_query_all_author_posts($author_id)
+	{
+		echo "WP_Query of all results for a given author" . '(' . $author_id . ')' . ":\n\n";
+
+		$results = new WP_Query(
+			array(
+				'author'         => $author_id,
+				'post_type'      => 'any',
+				'post_status'    => 'publish',
+				'posts_per_page' => 10,
+				'orderby'        => 'date', // or 'modified'?
+				'order'          => 'DESC',
+		) );
+
+		if ( $results->posts )
+		{
+			$ids = array();
+			foreach ( $results->posts as $hit )
+			{
+				$ids[] = $hit->ID;
+			}
+			echo implode( ', ', $ids ) . "\n\n";
+			return $ids;
+		}
+		else
+		{
+			echo 'no author posts found';
+			return FALSE;
+		}
+	}
+	
+	public function sphinx_query_all_author_posts($author_id)
+	{
+		echo "Sphinx query of all results for a given author" . '(' . $author_id . ')' . ":\n\n";
+
+		$this->client = FALSE; // ensure we get a new instance
+		$client = $this->client();
+		$client->SetLimits( 0, 10, 1000 );
+		$client->SetSortMode( SPH_SORT_EXTENDED, 'post_date_gmt DESC' );
+		$client->SetMatchMode( SPH_MATCH_EXTENDED );
+		$client->SetFilter( 'post_author', array( $author_id ) );
+		$results = $client->Query( '@post_status publish'); // @post_author ' . $author_id 
+		
+		if ( FALSE !== $results )
+		{
+			$ids = array();
+			foreach( $results['matches'] as $match )
+			{
+				$ids[] = $match['id'];
+			}
+			echo implode( ', ', $ids ) . "\n\n";
+			return $ids;
+		}
+		else
+		{
+			echo "query error: ";
+			print_r( $client->GetLastError() );
+			echo "\n\n";
+			return FALSE;
+		}
+	}
 
 }//END GO_Sphinx_Test2
