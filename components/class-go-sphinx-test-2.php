@@ -225,15 +225,4 @@ class GO_Sphinx_Test2 extends GO_Sphinx_Test
 		++$this->test_count;
 	}//END mutually_exclusive_posts_IN_test	
 
-
-	/**
-	 * "9. Using the author ID from #1, do a new query for all results
-	 * by that author. The MySQL and Sphinx results should be
-	 * indistinguishable."
-	 */
-	public function author_id_test()
-	{
-		// virtual
-	}
-
 }//END GO_Sphinx_Test2
