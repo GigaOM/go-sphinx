@@ -1,5 +1,8 @@
 <?php
 
+/**
+ * tests to compare WP_Query and Sphinx search results.
+ */
 class GO_Sphinx_Test extends GO_Sphinx
 {
 	public $ten_most_recent_hits_wp  = FALSE;
@@ -63,6 +66,10 @@ class GO_Sphinx_Test extends GO_Sphinx
 		++$this->test_count;
 
 		echo "$this->test_count.\n";
+		$this->post_in_single_test();
+		++$this->test_count;
+
+		echo "$this->test_count.\n";
 		$this->post_in_test();
 		++$this->test_count;
 
@@ -83,7 +90,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 		$spx_results = $this->sphinx_ten_most_recent_posts();
 		$this->compare_results( $wpq_results, $spx_results );
 		echo "---\n\n";
-	}
+	}//END ten_most_recent_posts_test
 
 	/**
 	 * "2. Pick the first of those rows [from 1.] that has taxonomy terms on
@@ -126,7 +133,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 		$this->compare_results( $wpq_results, $spx_results );
 
 		echo "---\n\n";
-	}
+	}//END most_recent_by_terms_test
 
 	/**
 	 * "4. Using the same post from #1, pick the most frequently used two
@@ -166,7 +173,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 		$this->compare_results( $wpq_results, $spx_results );
 
 		echo "---\n\n";
-	}
+	}//END most_recent_by_two_terms_test
 
 	/**
 	 * "5. Repeat the query from #4, but change the posts_per_page value to
@@ -192,7 +199,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 		$this->compare_results( $wpq_results, $spx_results );
 
 		echo "---\n\n";
-	}
+	}//END most_recent_by_two_terms_paged_test
 
 	public function wp_query_ten_most_recent_posts()
 	{
@@ -228,8 +235,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 			echo 'no post found';
 			return FALSE;
 		}
-	}
-
+	}//END wp_query_ten_most_recent_posts
 
 	public function sphinx_ten_most_recent_posts()
 	{
@@ -260,7 +266,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 			echo "\n\n";
 			return FALSE;
 		}
-	}
+	}//END sphinx_ten_most_recent_posts
 
 	/**
 	 * find the most frequently used terms in the first post in $posts
@@ -309,7 +315,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 			}
 		}
 		return $results;
-	}
+	}// END get_most_used_terms
 
 	public function wp_query_most_recent_by_terms( $terms, $num_results, $page_num = FALSE, $use_in_query = FALSE )
 	{
@@ -385,7 +391,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 		echo implode( ', ', $ids ) . "\n\n";
 
 		return $ids;
-	}
+	}//END wp_query_most_recent_by_terms
 
 	public function sphinx_most_recent_by_terms( $terms, $num_results, $page_num = FALSE )
 	{
@@ -454,7 +460,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 		echo implode( ', ', $ids ) . "\n\n";
 
 		return $ids;
-	}
+	}//END sphinx_most_recent_by_terms
 
 	// compare wpq and spx results
 	public function compare_results( $wpq_results, $spx_results )
@@ -469,22 +475,292 @@ class GO_Sphinx_Test extends GO_Sphinx
 		}
 
 		echo 'WP_Query and Sphinx results ' . ( empty( $results_diff ) ? '' : 'DO NOT ' ) . "match\n\n";
-	}
+	}//END compare_results
 
+	/**
+	 * 6. Using the query from #1, pick two posts. Pick the most frequently
+	 * used term on each post that doesn’t appear on the other post. Do a
+	 * new AND query with those terms. Neither of the two exemplar posts
+	 * should be returned in the result.
+	 */
 	public function mutually_exclusive_posts_test()
 	{
-		// virtual
-	}
+		$query_terms = $this->setup_mutually_exclusive_posts_test();
+		$this->WP_mutually_exclusive_posts_test( $query_terms, FALSE );
+		$this->SP_mutually_exclusive_posts_test( $query_terms, FALSE );
+		echo "---\n\n";
+	}//END mutually_exclusive_posts_test
 
+	// find the two posts with terms that're not in any other posts
+	public function setup_mutually_exclusive_posts_test()
+	{
+		$post_ids_to_terms = array();
+		foreach ( $this->ten_most_recent_hits_wp as $post )
+		{
+			$post_ids_to_terms[ $post->ID ] = $this->get_most_used_terms( array($post) );
+		}
+
+		$post_ids_to_ttids = array(); // maps post ids to ttid lists
+		$ttids_to_terms = array();    // maps ttids to term objects
+
+		foreach ( $post_ids_to_terms as $post_id => $terms_list ) 
+		{
+			$ttids = array();
+			foreach ($terms_list as $term_obj)
+			{
+				$ttids[] = $term_obj['term']->term_taxonomy_id;
+				$ttids_to_terms[ $term_obj['term']->term_taxonomy_id ] = $term_obj['term'];
+			}
+
+			$post_ids_to_ttids[ $post_id ] = $ttids;
+		}
+
+		// now look for two posts and a term in each post that only appears
+		// in that post.
+		$query_terms = array();
+		foreach ( $post_ids_to_ttids as $post_id => $ttid_list )
+		{
+			foreach ( $ttid_list as $ttid )
+			{
+				if ( ! $this->is_ttid_in_array( $post_ids_to_ttids, $post_id, $ttid ) )
+				{
+					$query_terms[ $post_id ] =  $ttids_to_terms[ $ttid ];
+
+					if ( 2 <= count( $query_terms ) )
+					{
+						break; // we found enough results
+					}
+				}
+			}
+			if ( 2 <= count( $query_terms ) ) 
+			{
+				break;
+			}
+		}
+
+		return $query_terms;
+	} //END setup_mutually_exclusive_posts_test
+
+	/**
+	 * @param $query_terms array of post id mapped to term objects to search
+	 * @param $is_IN_test whether to use the "IN" (OR) test or not.
+	 */		
+	public function WP_mutually_exclusive_posts_test( $query_terms, $is_IN_test )
+	{
+		$tax_query = $is_IN_test ? array( 'relation' => 'OR' ) : array( 'relation' => 'AND' );
+		foreach( $query_terms as $term )
+		{
+			$tax_query[] = array(
+				'taxonomy' => $term->taxonomy,
+				'field'    => 'id',
+				'terms'	   => $term->term_id,
+				);
+		}
+
+		$query_results = new WP_Query(
+			array(
+				'fields'         => 'ids',
+				'post_type'      => 'any',
+				'post_status'    => 'publish',
+				'posts_per_page' => 10,
+				'orderby'        => 'date',
+				'order'          => 'DESC',
+				'tax_query'      => $tax_query,
+				) );
+
+		// make sure keys from $query_terms are not in $query_results...
+		$test_failed = FALSE;
+		foreach ( $query_terms as $post_id => $term_obj )
+		{
+			if ( ( in_array( $post_id, $query_results->posts ) && ! $is_IN_test ) ||
+				 ( ! in_array( $post_id, $query_results->posts ) && $is_IN_test ) )
+			{
+				// we shouldn't find any post from $query_terms in the search
+				// results when not performing the "IN" test,
+				// and we should find all posts from $query_terms in the search
+				// results when performing the "IN" test
+				$test_failed = TRUE;
+				break;
+			}
+		}
+
+		echo 'WP_Query for test ' . $this->test_count . ' ' . ( ( $test_failed ) ? "FAILED" : "PASSED" ) . ".\n\n";
+	} // END WP_mutually_exclusive_posts_test
+
+	public function is_ttid_in_array($post_ids, $post_to_ignore, $ttid)
+	{
+		foreach ( $post_ids as $post_id => $ttid_list ) 
+		{
+			if ( $post_id == $post_to_ignore ) continue;
+			if ( in_array($ttid, $ttid_list) )
+			{
+				return TRUE;
+			}
+		}
+		
+		return FALSE;
+	} // END is_ttid_in_array
+	
+	/**
+	 * @param $query_terms array of post id mapped to term objects to search
+	 * @param $is_IN_test whether to use the "IN" (OR) test or not.
+	 */		
+	public function SP_mutually_exclusive_posts_test( $query_terms, $is_IN_test )
+	{
+		$this->client = FALSE; // ensure we get a new instance
+		$client = $this->client();
+
+		$ttids = array();
+		if ( $is_IN_test )
+		{
+			$ttids = array();
+			foreach( $query_terms as $term )
+			{
+				$ttids[] = $term->term_taxonomy_id;
+			}
+			$client->SetFilter( 'tt_id', $ttids );
+		}
+		else
+		{
+			foreach( $query_terms as $term )
+			{
+				// set a filter for each ttid to filter to get the AND behavior
+				$client->SetFilter( 'tt_id', array( $term->term_taxonomy_id ) );
+			}
+		}
+
+		$client->SetLimits( 0, 10, 1000 );
+		$client->SetSortMode( SPH_SORT_EXTENDED, 'post_date_gmt DESC' );
+		$client->SetMatchMode( SPH_MATCH_EXTENDED );
+		$results = $client->Query( '@post_status publish' );
+
+		if ( FALSE === $results )
+		{
+			echo "query error: ";
+			print_r( $client->GetLastError() );
+			echo "\n\n";
+			return;
+		}
+
+		$matched_post_ids = array();
+		if ( isset( $results['matches'] ) )
+		{
+			foreach( $results['matches'] as $match )
+			{
+				$matched_post_ids[] = $match['id'];
+			}
+		}
+
+		// make sure keys from $results are not in $terms...
+		$test_failed = FALSE;
+		foreach ( $query_terms as $post_id => $term_obj )
+		{
+			if ( ( in_array( $post_id, $matched_post_ids ) && ! $is_IN_test ) ||
+				 ( ! in_array( $post_id, $matched_post_ids ) && $is_IN_test ) )
+			{
+				// we shouldn't find any post from $query_terms in the search
+				// results when not performing the "IN" test,
+				// and we should find all posts from $query_terms in the search
+				// results when performing the "IN" test
+				$test_failed = TRUE;
+				break;
+			}
+		}
+
+		echo 'Sphinx query for test ' . $this->test_count . ' ' . ( ( $test_failed ) ? "FAILED" : "PASSED" ) . ".\n\n";
+		
+	}//END SP_mutually_exclusive_posts_test
+
+	/**
+	 * 7. Using the terms from #6, do a new IN query with those terms.
+	 * Both the exemplar posts from #4 should appear in the results
+	 */
 	public function mutually_exclusive_posts_IN_test()
 	{
-		// virtual
-	}
+		$query_terms = $this->setup_mutually_exclusive_posts_test();
 
+		$this->WP_mutually_exclusive_posts_test( $query_terms, TRUE );
+		$this->SP_mutually_exclusive_posts_test( $query_terms, TRUE );
+		echo "---\n\n";
+	}//END mutually_exclusive_posts_IN_test
+	
+	/**
+	 * 9. Using the author ID from #1, do a new query for all results by that author
+	 * The MySQL and Sphinx results should be indistinguishable
+	 */
 	public function author_id_test()
 	{
-		// virtual
-	}
+		//	do the wp version . . .
+		echo "\n";
+		$wp_author_results = $this->wp_query_all_author_posts( $this->ten_most_recent_hits_wp[0]->post_author );
+		echo "\n";
+		//	do the sphinx version . . .
+		$sp_author_results = $this->sphinx_query_all_author_posts( $this->ten_most_recent_hits_spx[0]['attrs']['post_author'] );
+		$this->compare_results( $wpq_results, $spx_results );		
+		echo "---\n\n";
+	}//END author_id_test	
+	
+	public function wp_query_all_author_posts($author_id)
+	{
+		echo "WP_Query of all results for a given author" . '(' . $author_id . ')' . ":\n\n";
+
+		$results = new WP_Query(
+			array(
+				'author'         => $author_id,
+				'post_type'      => 'any',
+				'post_status'    => 'publish',
+				'posts_per_page' => 10,
+				'orderby'        => 'date', // or 'modified'?
+				'order'          => 'DESC',
+		) );
+
+		if ( $results->posts )
+		{
+			$ids = array();
+			foreach ( $results->posts as $hit )
+			{
+				$ids[] = $hit->ID;
+			}
+			echo implode( ', ', $ids ) . "\n\n";
+			return $ids;
+		}
+		else
+		{
+			echo 'no author posts found';
+			return FALSE;
+		}
+	}//END wp_query_all_author_posts
+	
+	public function sphinx_query_all_author_posts($author_id)
+	{
+		echo "Sphinx query of all results for a given author" . '(' . $author_id . ')' . ":\n\n";
+
+		$this->client = FALSE; // ensure we get a new instance
+		$client = $this->client();
+		$client->SetLimits( 0, 10, 1000 );
+		$client->SetSortMode( SPH_SORT_EXTENDED, 'post_date_gmt DESC' );
+		$client->SetMatchMode( SPH_MATCH_EXTENDED );
+		$client->SetFilter( 'post_author', array( $author_id ) );
+		$results = $client->Query( '@post_status publish'); // @post_author ' . $author_id 
+		
+		if ( FALSE !== $results )
+		{
+			$ids = array();
+			foreach( $results['matches'] as $match )
+			{
+				$ids[] = $match['id'];
+			}
+			echo implode( ', ', $ids ) . "\n\n";
+			return $ids;
+		}
+		else
+		{
+			echo "query error: ";
+			print_r( $client->GetLastError() );
+			echo "\n\n";
+			return FALSE;
+		}
+	}//END sphinx_query_all_author_posts
 
 	/**
 	 * "8. Using the term from #1, do a new query using the term name as the
@@ -571,7 +847,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 			echo "test PASSED.\n\n";
 		}
 		echo "\n---\n\n";
-	}
+	}//END most_recent_by_term_name_test
 
 	/**
 	 * "10. Using the post IDs from #2, do a new query for the 10 most
@@ -632,7 +908,6 @@ class GO_Sphinx_Test extends GO_Sphinx
 		$client->SetSortMode( SPH_SORT_EXTENDED, 'post_date_gmt DESC, @rank DESC' );
 		$client->SetMatchMode( SPH_MATCH_EXTENDED );
 		$client->SetFilter( '@id', $excluded_posts, TRUE );
-		//$spx_results = $client->Query( '@!id ' . implode( ' ', $excluded_posts ) . ' @post_status publish' );
 		$spx_results = $client->Query( '@post_status publish' );
 
 		if ( FALSE === $spx_results )
@@ -668,6 +943,87 @@ class GO_Sphinx_Test extends GO_Sphinx
 
 		echo "---\n\n";
 	}//END post_not_in_test
+
+	/**
+	 * 11. Using the posts from #1, repeat the query using the ID of the 3rd ordinal post as a post__in argument.
+	 * Only one post should be returned, it should match the post ID used as the post__in argument.
+	 */
+	public function post_in_single_test()
+	{
+		// get the ten most recent posts as in test #1.
+		$posts = $this->ten_most_recent_hits_wp;
+		if ( empty( $posts ) )
+		{
+			echo "no posts found \n\n";
+			return;
+		}
+		
+		//wp_dbug($posts);
+		$id_to_test = $posts[2]->ID;
+
+		$wpq_results = new WP_Query(
+			array(
+				'post_type'      => 'any',
+				'post_status'    => 'publish',
+				'posts_per_page' => 10,
+				'orderby'        => 'date', // or 'modified'?
+				'order'          => 'DESC',
+				'fields'         => 'ids',
+				'post__in'       => array($id_to_test),
+		) );
+		
+		if ( $wpq_results->post_count != 1 )
+		{
+			echo "did not find expected number of WP_Query results (1). FAILED\n\n";
+		}
+		else
+		{
+			if ( $wpq_results->posts[0] == $id_to_test )
+			{
+				echo "WP_Query results for test $this->test_count PASSED.\n\n";
+			}
+			else
+			{
+				echo "FAILED: unexpected id found in search results.\n\n";
+			}
+		}
+
+		// sphinx search
+		$this->client = FALSE; // ensure we get a new instance
+		$client = $this->client();
+		$client->SetLimits( 0, 10, 1000 );
+		$client->SetSortMode( SPH_SORT_EXTENDED, 'post_date_gmt DESC, @rank DESC' );
+		$client->SetMatchMode( SPH_MATCH_EXTENDED );
+		$client->SetFilter( '@id', array( $id_to_test ) );
+		$spx_results = $client->Query( '@post_status publish' );
+
+		if ( FALSE === $spx_results )
+		{
+			echo "query error: ";
+			print_r( $client->GetLastError() );
+			echo "\n---\n\n";
+			return;
+		}
+		
+		if ( 1 > count( $spx_results['matches'] ) )
+		{
+			echo "did not find expected number of Sphinx results (1). FAILED\n\n";
+		}
+		else
+		{
+			if ( $wpq_results->posts[0] == $id_to_test )
+			{
+				echo "Sphinx results for test $this->test_count: PASSED.\n\n";
+			}
+			else
+			{
+				echo "FAILED: unexpected id found in search results.\n\n";
+			}
+		}
+
+		echo "---\n\n";
+
+	}//END post_in_single_test
 
 	/**
 	 * "12. Repeat the query from #6, but include the post IDs from #7 as 
@@ -714,7 +1070,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 			}
 		}
 
-		echo 'WP_Query() for test ' . $this->test_count . ' ' . ( ( $test_failed ) ? "FAILED" : "PASSED" ) . ".\n\n";
+		echo 'WP_Query for test ' . $this->test_count . ' ' . ( ( $test_failed ) ? "FAILED" : "PASSED" ) . ".\n\n";
 
 		$this->client = FALSE; // ensure we get a new instance
 		$client = $this->client();
@@ -759,6 +1115,6 @@ class GO_Sphinx_Test extends GO_Sphinx
 		}
 
 		echo 'Sphinx query for test ' . $this->test_count . ' ' . ( ( $test_failed ) ? "FAILED" : "PASSED" ) . ".\n\n";
-	}
+	}//END post_in_test
 
 }//END GO_Sphinx_Test

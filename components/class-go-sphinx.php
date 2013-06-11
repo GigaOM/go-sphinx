@@ -55,11 +55,8 @@ class GO_Sphinx
 	{
 		if ( ! $this->test )
 		{
-			//TODO: enable after commits are merged from the two test files
-			//require_once __DIR__ . '/class-go-sphinx-test.php';
-			//$this->test = new GO_Sphinx_Test;
-			require_once __DIR__ . '/class-go-sphinx-test-2.php';
-			$this->test = new GO_Sphinx_Test2;			
+			require_once __DIR__ . '/class-go-sphinx-test.php';
+			$this->test = new GO_Sphinx_Test;
 		}
 
 		return $this->test;
