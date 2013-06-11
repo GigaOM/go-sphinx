@@ -19,12 +19,10 @@ class GO_Sphinx_Test2 extends GO_Sphinx_Test
 	 */
 	public function mutually_exclusive_posts_test()
 	{
-		echo "$this->test_count.\n";
 		$query_terms = $this->setup_mutually_exclusive_posts_test( $results );
 		$this->WP_mutually_exclusive_posts_test( $query_terms, FALSE );
 		$this->SP_mutually_exclusive_posts_test( $query_terms, FALSE );
 		echo "---\n\n";
-		++$this->test_count;
 	}//END mutually_exclusive_posts_test
 
 	// find the two posts with terms that're not in any other posts
@@ -203,14 +201,11 @@ class GO_Sphinx_Test2 extends GO_Sphinx_Test
 	 */
 	public function mutually_exclusive_posts_IN_test()
 	{
-		echo "$this->test_count.\n";
-
 		$query_terms = $this->setup_mutually_exclusive_posts_test( $results );
 
 		$this->WP_mutually_exclusive_posts_test( $query_terms, TRUE );
 		$this->SP_mutually_exclusive_posts_test( $query_terms );
 		echo "---\n\n";
-		++$this->test_count;
 	}//END mutually_exclusive_posts_IN_test
 	
 	/**
@@ -219,7 +214,6 @@ class GO_Sphinx_Test2 extends GO_Sphinx_Test
 	 */
 	public function author_id_test()
 	{
-		echo "$this->test_count.\n";
 		//	do the wp version . . .
 		echo "\n";
 		$wp_author_results = $this->wp_query_all_author_posts( $this->ten_most_recent_hits_wp[0]->post_author );
@@ -228,7 +222,6 @@ class GO_Sphinx_Test2 extends GO_Sphinx_Test
 		$sp_author_results = $this->sphinx_query_all_author_posts( $this->ten_most_recent_hits_spx[0]['attrs']['post_author'] );
 		$this->compare_results( $wpq_results, $spx_results );		
 		echo "---\n\n";
-		++$this->test_count;
 	}//END author_id_test	
 	
 	public function wp_query_all_author_posts($author_id)

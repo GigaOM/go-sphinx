@@ -42,15 +42,22 @@ class GO_Sphinx_Test extends GO_Sphinx
 		++$this->test_count;
 		$this->most_recent_by_two_terms_paged_test();
 
-		// invoke all tests in GO_Sphinx_Test2 from one function for
-		// easier merge later
-		$this->group_2_tests();
+		echo "$this->test_count.\n";
+		++$this->test_count;
+		$this->mutually_exclusive_posts_test();
 
+		echo "$this->test_count.\n";
+		++$this->test_count;
+		$this->mutually_exclusive_posts_IN_test();
+		
 		echo "$this->test_count.\n";
 		++$this->test_count;
 		$this->most_recent_by_term_name_test();
 
-		$this->test_count = 9;
+		echo "$this->test_count.\n";
+		++$this->test_count;
+		$this->author_id_test();
+
 		echo "$this->test_count.\n";
 		++$this->test_count;
 		$this->post_not_in_test();
@@ -458,22 +465,6 @@ class GO_Sphinx_Test extends GO_Sphinx
 		}
 
 		echo 'WP_Query and Sphinx results ' . ( empty( $results_diff ) ? '' : 'DO NOT ' ) . "match\n\n";
-	}
-
-	/**
-	 * run all tests from GO_Sphinx_Test2 from this function.
-	 */
-	public function group_2_tests()
-	{
-		// here's an example of invoking test functions in GO_Sphinx_Test2
-		// via a virtual function in this class. make sure the function has
-		// the same signature in both GO_Sphinx_Test (this class) and
-		// GO_Sphinx_Test2 (the subclass).
-		$this->mutually_exclusive_posts_test();
-
-		$this->mutually_exclusive_posts_IN_test();
-		
-		$this->author_id_test();
 	}
 
 	public function mutually_exclusive_posts_test()
