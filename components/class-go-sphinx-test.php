@@ -23,48 +23,48 @@ class GO_Sphinx_Test extends GO_Sphinx
 		echo "<pre>\n";
 
 		echo "$this->test_count.\n";
-		++$this->test_count;
 		$this->ten_most_recent_posts_test();
+		++$this->test_count;
 
 		echo "$this->test_count.\n";
-		++$this->test_count;
 		$this->most_recent_by_terms_test( 10 );
+		++$this->test_count;
 
 		echo "$this->test_count.\n";
-		++$this->test_count;
 		$this->most_recent_by_terms_test( 53 );
+		++$this->test_count;
 
 		echo "$this->test_count.\n";
-		++$this->test_count;
 		$this->most_recent_by_two_terms_test();
+		++$this->test_count;
 
 		echo "$this->test_count.\n";
-		++$this->test_count;
 		$this->most_recent_by_two_terms_paged_test();
+		++$this->test_count;
 
 		echo "$this->test_count.\n";
-		++$this->test_count;
 		$this->mutually_exclusive_posts_test();
+		++$this->test_count;
 
 		echo "$this->test_count.\n";
-		++$this->test_count;
 		$this->mutually_exclusive_posts_IN_test();
+		++$this->test_count;
 		
 		echo "$this->test_count.\n";
-		++$this->test_count;
 		$this->most_recent_by_term_name_test();
+		++$this->test_count;
 
 		echo "$this->test_count.\n";
-		++$this->test_count;
 		$this->author_id_test();
+		++$this->test_count;
 
 		echo "$this->test_count.\n";
-		++$this->test_count;
 		$this->post_not_in_test();
+		++$this->test_count;
 
 		echo "$this->test_count.\n";
-		++$this->test_count;
 		$this->post_in_test();
+		++$this->test_count;
 
 		echo "</pre>\n";
 		die;
@@ -677,7 +677,88 @@ class GO_Sphinx_Test extends GO_Sphinx
 	 */
 	public function post_in_test()
 	{
-		$query_terms = $this->setup_mutually_exclusive_posts_test( $results );
+		$tax_query = array( 'relation' => 'AND' );
+		$posts_in = array();
+
+		$query_terms = $this->setup_mutually_exclusive_posts_test();
+		foreach( $query_terms as $post_id => $term )
+		{
+			$tax_query[] = array(
+				'taxonomy' => $term->taxonomy,
+				'field'    => 'id',
+				'terms'	   => $term->term_id,
+				);
+			$posts_in[] = $post_id;
+		}
+
+		$query_results = new WP_Query(
+			array(
+				'fields'         => 'ids',
+				'post_type'      => 'any',
+				'post_status'    => 'publish',
+				'posts_per_page' => 10,
+				'orderby'        => 'date',
+				'order'          => 'DESC',
+				'tax_query'      => $tax_query,
+				'post__in'       => $posts_in,
+				) );
+
+		// make sure keys (post_id) from $query_terms are not in $query_results
+		$test_failed = FALSE;
+		foreach ( $query_terms as $post_id => $term_obj )
+		{
+			if ( in_array( $post_id, $query_results->posts ) )
+			{
+				$test_failed = TRUE;
+				break;
+			}
+		}
+
+		echo 'WP_Query() for test ' . $this->test_count . ' ' . ( ( $test_failed ) ? "FAILED" : "PASSED" ) . ".\n\n";
+
+		$this->client = FALSE; // ensure we get a new instance
+		$client = $this->client();
+
+		$ttids = array();
+		foreach( $query_terms as $term )
+		{
+			// set a filter for each ttid to filter to get the AND behavior
+			$client->SetFilter( 'tt_id', array( $term->term_taxonomy_id ) );
+		}
+		$client->SetFilter( '@id', $posts_in);
+		$client->SetLimits( 0, 10, 1000 );
+		$client->SetSortMode( SPH_SORT_EXTENDED, 'post_date_gmt DESC' );
+		$client->SetMatchMode( SPH_MATCH_EXTENDED );
+		$results = $client->Query( '@post_status publish' );
+
+		if ( FALSE === $results )
+		{
+			echo "query error: ";
+			print_r( $client->GetLastError() );
+			echo "\n\n";
+			return;
+		}
+
+		// make sure ids from $posts_in are not in $results['matches']
+		$matched_post_ids = array();
+		if ( isset( $results['matches'] ) )
+		{
+			foreach( $results['matches'] as $match )
+			{
+				$matched_post_ids[] = $match['id'];
+			}
+		}
+		$test_failed = FALSE;
+		foreach ( $query_terms as $post_id => $term_obj )
+		{
+			if ( in_array( $post_id, $matched_post_ids ) )
+			{
+				$test_failed = TRUE;
+				break;
+			}
+		}
+
+		echo 'Sphinx query for test ' . $this->test_count . ' ' . ( ( $test_failed ) ? "FAILED" : "PASSED" ) . ".\n\n";
 	}
 
 }//END GO_Sphinx_Test

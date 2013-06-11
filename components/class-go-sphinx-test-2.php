@@ -19,7 +19,7 @@ class GO_Sphinx_Test2 extends GO_Sphinx_Test
 	 */
 	public function mutually_exclusive_posts_test()
 	{
-		$query_terms = $this->setup_mutually_exclusive_posts_test( $results );
+		$query_terms = $this->setup_mutually_exclusive_posts_test();
 		$this->WP_mutually_exclusive_posts_test( $query_terms, FALSE );
 		$this->SP_mutually_exclusive_posts_test( $query_terms, FALSE );
 		echo "---\n\n";
@@ -119,7 +119,7 @@ class GO_Sphinx_Test2 extends GO_Sphinx_Test
 		}
 
 		echo 'WP_Query() for test ' . $this->test_count . ' ' . ( ( $test_failed ) ? "FAILED" : "PASSED" ) . ".\n\n";
-	} // END setup_mutually_exclusive_posts_test
+	} // END WP_mutually_exclusive_posts_test
 
 	public function is_ttid_in_array($post_ids, $post_to_ignore, $ttid)
 	{
@@ -213,7 +213,7 @@ class GO_Sphinx_Test2 extends GO_Sphinx_Test
 	 */
 	public function mutually_exclusive_posts_IN_test()
 	{
-		$query_terms = $this->setup_mutually_exclusive_posts_test( $results );
+		$query_terms = $this->setup_mutually_exclusive_posts_test();
 
 		$this->WP_mutually_exclusive_posts_test( $query_terms, TRUE );
 		$this->SP_mutually_exclusive_posts_test( $query_terms, TRUE );
