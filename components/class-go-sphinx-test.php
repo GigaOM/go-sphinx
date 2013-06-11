@@ -467,6 +467,8 @@ class GO_Sphinx_Test extends GO_Sphinx
 		$this->mutually_exclusive_posts_test();
 
 		$this->mutually_exclusive_posts_IN_test();
+		
+		$this->author_test();
 	}
 
 	public function mutually_exclusive_posts_test()
