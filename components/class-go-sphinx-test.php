@@ -62,6 +62,10 @@ class GO_Sphinx_Test extends GO_Sphinx
 		++$this->test_count;
 		$this->post_not_in_test();
 
+		echo "$this->test_count.\n";
+		++$this->test_count;
+		$this->post_in_test();
+
 		echo "</pre>\n";
 		die;
 	}
@@ -613,7 +617,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 			$diff = array_diff( $wpq_results->posts, $excluded_posts );
 			if ( count( $diff ) == 10 )
 			{
-				echo "WP_Query results PASSED.\n\n";
+				echo "WP_Query results do not include any id from the exclusion list. PASSED.\n\n";
 			}
 			else
 			{
@@ -654,7 +658,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 			$diff = array_diff( $matched_ids, $excluded_posts );
 			if ( count( $diff ) == 10 )
 			{
-				echo "Sphinx results PASSED.\n\n";
+				echo "Sphinx results do not include any id from the exclusion list. PASSED.\n\n";
 			}
 			else
 			{
@@ -663,6 +667,17 @@ class GO_Sphinx_Test extends GO_Sphinx
 		}
 
 		echo "---\n\n";
+	}//END post_not_in_test
+
+	/**
+	 * "12. Repeat the query from #6, but include the post IDs from #7 as 
+	 * a post__in argument.
+	 * "The results of this query should be the same as #6, with neither of
+	 * the exemplar posts used to generate #6 returned."
+	 */
+	public function post_in_test()
+	{
+		$query_terms = $this->setup_mutually_exclusive_posts_test( $results );
 	}
 
 }//END GO_Sphinx_Test

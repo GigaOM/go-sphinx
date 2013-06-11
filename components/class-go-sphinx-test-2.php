@@ -145,10 +145,22 @@ class GO_Sphinx_Test2 extends GO_Sphinx_Test
 		$client = $this->client();
 
 		$ttids = array();
-		foreach( $query_terms as $term )
+		if ( $is_IN_test )
 		{
-			// set a filter for each ttid to filter to get the AND behavior
-			$client->SetFilter( 'tt_id', array( $term->term_taxonomy_id ) );
+			$ttids = array();
+			foreach( $query_terms as $term )
+			{
+				$ttids[] = $term->term_taxonomy_id;
+			}
+			$client->SetFilter( 'tt_id', $ttids );
+		}
+		else
+		{
+			foreach( $query_terms as $term )
+			{
+				// set a filter for each ttid to filter to get the AND behavior
+				$client->SetFilter( 'tt_id', array( $term->term_taxonomy_id ) );
+			}
 		}
 
 		$client->SetLimits( 0, 10, 1000 );
@@ -204,7 +216,7 @@ class GO_Sphinx_Test2 extends GO_Sphinx_Test
 		$query_terms = $this->setup_mutually_exclusive_posts_test( $results );
 
 		$this->WP_mutually_exclusive_posts_test( $query_terms, TRUE );
-		$this->SP_mutually_exclusive_posts_test( $query_terms );
+		$this->SP_mutually_exclusive_posts_test( $query_terms, TRUE );
 		echo "---\n\n";
 	}//END mutually_exclusive_posts_IN_test
 	
