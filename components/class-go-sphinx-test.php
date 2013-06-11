@@ -481,6 +481,11 @@ class GO_Sphinx_Test extends GO_Sphinx
 		// virtual
 	}
 
+	public function author_id_test()
+	{
+		// virtual
+	}
+
 	/**
 	 * "8. Using the term from #1, do a new query using the term name as the
 	 *  keyword search string. The MySQL and Sphinx results should be
@@ -506,8 +511,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 				'orderby'        => 'date', // or 'modified'?
 				'order'          => 'DESC',
 				'fields'         => 'ids',
-				/* 's'              => '"' . $term->name . '"', */
-				's'              => 'database',
+				's'              => '"' . $term->name . '"',
 		) );
 
 		$this->client = FALSE; // ensure we get a new instance
@@ -517,7 +521,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 		//$client->SetSortMode( SPH_SORT_EXTENDED, '@rank DESC, post_date_gmt DESC' );
 		$client->SetSortMode( SPH_SORT_EXTENDED, 'post_date_gmt DESC, @rank DESC' );
 		$client->SetMatchMode( SPH_MATCH_EXTENDED );
-		$spx_results = $client->Query( '"' . $term->name . '" @post_status publish' );
+		$spx_results = $client->Query( '@post_content "' . $term->name . '" @post_status publish' );
 
 		if ( FALSE === $spx_results )
 		{
@@ -536,7 +540,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 			}
 		}
 
-		if ( count( $wpq_results->posts ) > count( $spx_result_ids ) )
+		if ( count( $wpq_results->posts ) >= count( $spx_result_ids ) )
 		{
 			$diff = array_diff( $wpq_results->posts, $spx_result_ids );
 			$source_len = count( $wpq_results->posts );
@@ -547,9 +551,17 @@ class GO_Sphinx_Test extends GO_Sphinx
 			$source_len = count( $spx_result_ids );
 		}
 
+		echo "search term: \"$term->name\"\n";
+		echo "WP_Query results:\n";
+		print_r( $wpq_results->posts );
+		echo "Sphinx results:\n";
+		print_r( $spx_result_ids );
+		echo "difference:\n";
+		print_r( $diff );
+
 		// our rough definition of similar: the difference should not be
 		// more than 1/3 of the length of the longer result array
-		// 
+		echo "\n";
 		if ( count( $diff ) > ( $source_len / 3 ) )
 		{
 			echo 'test FAILED: WP_Query and Sphinx results differ by ' . count( $diff ) . " out of $source_len posts.\n\n" ;
@@ -558,10 +570,6 @@ class GO_Sphinx_Test extends GO_Sphinx
 		{
 			echo "test PASSED.\n\n";
 		}
-		echo "WP_Query results:\n";
-		print_r( $wpq_results->posts );
-		echo "Sphinx results:\n";
-		print_r( $spx_result_ids );
 		echo "\n---\n\n";
 	}
 }//END GO_Sphinx_Test
