@@ -81,6 +81,8 @@ class GO_Sphinx_Test extends GO_Sphinx
 	 * "1. Query for the 10 most recent posts (not necessarily post_type=post)
 	 *  in the posts table. The MySQL and Sphinx results should be
 	 * indistinguishable."
+	 *
+	 * query_var: posts_per_page, order, orderby, post_type, post_status
 	 */
 	public function ten_most_recent_posts_test()
 	{
@@ -98,9 +100,14 @@ class GO_Sphinx_Test extends GO_Sphinx
 	 * do a query for posts that have that term; The exemplar post from #1
 	 * should be returned in this query."
 	 *
+	 * query_var: tax_query, posts_per_page, order, orderby, post_type,
+	 *            post_status
+	 *
 	 * "3. Repeat the query from #2, but change the posts_per_page value to
 	 * 53. The query should return up to 53 posts; the MySQL and Sphinx
 	 * results should be indistinguishable."
+	 *
+	 * query_var: tax_query, posts_per_page
 	 */
 	public function most_recent_by_terms_test( $num_posts )
 	{
@@ -139,6 +146,8 @@ class GO_Sphinx_Test extends GO_Sphinx
 	 * "4. Using the same post from #1, pick the most frequently used two
 	 * terms on that post and do a new query for posts with those terms.
 	 * The exemplar post from #1 should be returned in this query."
+	 *
+	 * query_var: tax_query
 	 */
 	public function most_recent_by_two_terms_test()
 	{
@@ -180,6 +189,8 @@ class GO_Sphinx_Test extends GO_Sphinx
 	 *  3 and paged to 3. The query should return up to 3 posts starting
 	 *  with the last post returned in #4; the MySQL and Sphinx results 
 	 *  should be indistinguishable."
+	 *
+	 * query_var: tax_query, paged
 	 */
 	public function most_recent_by_two_terms_paged_test()
 	{
@@ -482,6 +493,8 @@ class GO_Sphinx_Test extends GO_Sphinx
 	 * used term on each post that doesn’t appear on the other post. Do a
 	 * new AND query with those terms. Neither of the two exemplar posts
 	 * should be returned in the result.
+	 *
+	 * query_var: tax_query
 	 */
 	public function mutually_exclusive_posts_test()
 	{
@@ -674,6 +687,8 @@ class GO_Sphinx_Test extends GO_Sphinx
 	/**
 	 * 7. Using the terms from #6, do a new IN query with those terms.
 	 * Both the exemplar posts from #4 should appear in the results
+	 *
+	 * query_var: tax_query
 	 */
 	public function mutually_exclusive_posts_IN_test()
 	{
@@ -685,87 +700,11 @@ class GO_Sphinx_Test extends GO_Sphinx
 	}//END mutually_exclusive_posts_IN_test
 	
 	/**
-	 * 9. Using the author ID from #1, do a new query for all results by that author
-	 * The MySQL and Sphinx results should be indistinguishable
-	 */
-	public function author_id_test()
-	{
-		//	do the wp version . . .
-		echo "\n";
-		$wp_author_results = $this->wp_query_all_author_posts( $this->ten_most_recent_hits_wp[0]->post_author );
-		echo "\n";
-		//	do the sphinx version . . .
-		$sp_author_results = $this->sphinx_query_all_author_posts( $this->ten_most_recent_hits_spx[0]['attrs']['post_author'] );
-		$this->compare_results( $wpq_results, $spx_results );		
-		echo "---\n\n";
-	}//END author_id_test	
-	
-	public function wp_query_all_author_posts($author_id)
-	{
-		echo "WP_Query of all results for a given author" . '(' . $author_id . ')' . ":\n\n";
-
-		$results = new WP_Query(
-			array(
-				'author'         => $author_id,
-				'post_type'      => 'any',
-				'post_status'    => 'publish',
-				'posts_per_page' => 10,
-				'orderby'        => 'date', // or 'modified'?
-				'order'          => 'DESC',
-		) );
-
-		if ( $results->posts )
-		{
-			$ids = array();
-			foreach ( $results->posts as $hit )
-			{
-				$ids[] = $hit->ID;
-			}
-			echo implode( ', ', $ids ) . "\n\n";
-			return $ids;
-		}
-		else
-		{
-			echo 'no author posts found';
-			return FALSE;
-		}
-	}//END wp_query_all_author_posts
-	
-	public function sphinx_query_all_author_posts($author_id)
-	{
-		echo "Sphinx query of all results for a given author" . '(' . $author_id . ')' . ":\n\n";
-
-		$this->client = FALSE; // ensure we get a new instance
-		$client = $this->client();
-		$client->SetLimits( 0, 10, 1000 );
-		$client->SetSortMode( SPH_SORT_EXTENDED, 'post_date_gmt DESC' );
-		$client->SetMatchMode( SPH_MATCH_EXTENDED );
-		$client->SetFilter( 'post_author', array( $author_id ) );
-		$results = $client->Query( '@post_status publish'); // @post_author ' . $author_id 
-		
-		if ( FALSE !== $results )
-		{
-			$ids = array();
-			foreach( $results['matches'] as $match )
-			{
-				$ids[] = $match['id'];
-			}
-			echo implode( ', ', $ids ) . "\n\n";
-			return $ids;
-		}
-		else
-		{
-			echo "query error: ";
-			print_r( $client->GetLastError() );
-			echo "\n\n";
-			return FALSE;
-		}
-	}//END sphinx_query_all_author_posts
-
-	/**
 	 * "8. Using the term from #1, do a new query using the term name as the
 	 *  keyword search string. The MySQL and Sphinx results should be
 	 *  similar, though differences in sort order might be expected."
+	 *
+	 * query_var: s (keyword search)
 	 */
 	public function most_recent_by_term_name_test()
 	{
@@ -850,10 +789,92 @@ class GO_Sphinx_Test extends GO_Sphinx
 	}//END most_recent_by_term_name_test
 
 	/**
+	 * 9. Using the author ID from #1, do a new query for all results by
+	 * that author. The MySQL and Sphinx results should be indistinguishable.
+	 *
+	 * query_var: author, single id
+	 */
+	public function author_id_test()
+	{
+		//	do the wp version . . .
+		echo "\n";
+		$wp_author_results = $this->wp_query_all_author_posts( $this->ten_most_recent_hits_wp[0]->post_author );
+		echo "\n";
+		//	do the sphinx version . . .
+		$sp_author_results = $this->sphinx_query_all_author_posts( $this->ten_most_recent_hits_spx[0]['attrs']['post_author'] );
+		$this->compare_results( $wpq_results, $spx_results );		
+		echo "---\n\n";
+	}//END author_id_test	
+	
+	public function wp_query_all_author_posts($author_id)
+	{
+		echo "WP_Query of all results for a given author" . '(' . $author_id . ')' . ":\n\n";
+
+		$results = new WP_Query(
+			array(
+				'author'         => $author_id,
+				'post_type'      => 'any',
+				'post_status'    => 'publish',
+				'posts_per_page' => 10,
+				'orderby'        => 'date', // or 'modified'?
+				'order'          => 'DESC',
+		) );
+
+		if ( $results->posts )
+		{
+			$ids = array();
+			foreach ( $results->posts as $hit )
+			{
+				$ids[] = $hit->ID;
+			}
+			echo implode( ', ', $ids ) . "\n\n";
+			return $ids;
+		}
+		else
+		{
+			echo 'no author posts found';
+			return FALSE;
+		}
+	}//END wp_query_all_author_posts
+	
+	public function sphinx_query_all_author_posts($author_id)
+	{
+		echo "Sphinx query of all results for a given author" . '(' . $author_id . ')' . ":\n\n";
+
+		$this->client = FALSE; // ensure we get a new instance
+		$client = $this->client();
+		$client->SetLimits( 0, 10, 1000 );
+		$client->SetSortMode( SPH_SORT_EXTENDED, 'post_date_gmt DESC' );
+		$client->SetMatchMode( SPH_MATCH_EXTENDED );
+		$client->SetFilter( 'post_author', array( $author_id ) );
+		$results = $client->Query( '@post_status publish'); // @post_author ' . $author_id 
+		
+		if ( FALSE !== $results )
+		{
+			$ids = array();
+			foreach( $results['matches'] as $match )
+			{
+				$ids[] = $match['id'];
+			}
+			echo implode( ', ', $ids ) . "\n\n";
+			return $ids;
+		}
+		else
+		{
+			echo "query error: ";
+			print_r( $client->GetLastError() );
+			echo "\n\n";
+			return FALSE;
+		}
+	}//END sphinx_query_all_author_posts
+
+	/**
 	 * "10. Using the post IDs from #2, do a new query for the 10 most
 	 *  recent posts that excludes the post IDs from the earlier query
 	 *  using post__not_in. Both the MySQL and Sphinx results should
 	 *  exclude those posts.
+	 *
+	 * query_var: post__not_in
 	 */
 	public function post_not_in_test()
 	{
@@ -947,6 +968,8 @@ class GO_Sphinx_Test extends GO_Sphinx
 	/**
 	 * 11. Using the posts from #1, repeat the query using the ID of the 3rd ordinal post as a post__in argument.
 	 * Only one post should be returned, it should match the post ID used as the post__in argument.
+	 *
+	 * query_var: post__in
 	 */
 	public function post_in_single_test()
 	{
@@ -1030,6 +1053,8 @@ class GO_Sphinx_Test extends GO_Sphinx
 	 * a post__in argument.
 	 * "The results of this query should be the same as #6, with neither of
 	 * the exemplar posts used to generate #6 returned."
+	 *
+	 * query_var: post__in
 	 */
 	public function post_in_test()
 	{
