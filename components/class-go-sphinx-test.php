@@ -504,8 +504,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 				'orderby'        => 'date', // or 'modified'?
 				'order'          => 'DESC',
 				'fields'         => 'ids',
-				/* 's'              => '"' . $term->name . '"', */
-				's'              => 'database',
+				's'              => '"' . $term->name . '"',
 		) );
 
 		$this->client = FALSE; // ensure we get a new instance
