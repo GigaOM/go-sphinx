@@ -81,6 +81,10 @@ class GO_Sphinx_Test extends GO_Sphinx
 		$this->not_author_id_test();
 		++$this->test_count;
 
+		echo "$this->test_count.\n";
+		$this->category_in_test();
+		++$this->test_count;
+
 		echo "</pre>\n";
 		die;
 	}
@@ -270,11 +274,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 		if ( FALSE !== $results )
 		{
 			$this->ten_most_recent_hits_spx = $results['matches'];
-			$ids = array();
-			foreach( $this->ten_most_recent_hits_spx as $match )
-			{
-				$ids[] = $match['id'];
-			}
+			$ids = $this->extract_sphinx_matches_ids( $results );
 			echo implode( ', ', $ids ) . "\n\n";
 			return $ids;
 		}
@@ -286,6 +286,22 @@ class GO_Sphinx_Test extends GO_Sphinx
 			return FALSE;
 		}
 	}//END sphinx_ten_most_recent_posts
+
+	public function extract_sphinx_matches_ids( $sp_results )
+	{
+		$ids = array();
+		if ( ! isset( $sp_results['matches'] ) )
+		{
+			return $ids;
+		}
+
+		foreach( $sp_results['matches'] as $match )
+		{
+			$ids[] = $match['id'];
+		}
+
+		return $ids;
+	}//END extract_sphinx_matches_ids
 
 	/**
 	 * find the most frequently used terms in the first post in $posts
@@ -470,11 +486,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 			return FALSE;
 		}
 
-		$ids = array();
-		foreach( $results['matches'] as $match )
-		{
-			$ids[] = $match['id'];
-		}
+		$ids = $this->extract_sphinx_matches_ids( $results );
 
 		echo implode( ', ', $ids ) . "\n\n";
 
@@ -669,14 +681,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 			return;
 		}
 
-		$matched_post_ids = array();
-		if ( isset( $results['matches'] ) )
-		{
-			foreach( $results['matches'] as $match )
-			{
-				$matched_post_ids[] = $match['id'];
-			}
-		}
+		$matched_post_ids = $this->extract_sphinx_matches_ids( $results );
 
 		// make sure keys from $results are not in $terms...
 		$test_failed = FALSE;
@@ -760,14 +765,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 			return;
 		}
 
-		$spx_result_ids = array();
-		if ( isset( $spx_results['matches'] ) )
-		{
-			foreach( $spx_results['matches'] as $match )
-			{
-				$spx_result_ids[] = $match['id'];
-			}
-		}
+		$spx_result_ids = $this->extract_sphinx_matches_ids( $spx_results );
 
 		if ( count( $wpq_results->posts ) >= count( $spx_result_ids ) )
 		{
@@ -880,11 +878,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 		
 		if ( FALSE !== $results )
 		{
-			$ids = array();
-			foreach( $results['matches'] as $match )
-			{
-				$ids[] = $match['id'];
-			}
+			$ids = $this->extract_sphinx_matches_ids( $results );
 			echo implode( ', ', $ids ) . "\n\n";
 			return $ids;
 		}
@@ -974,11 +968,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 		}
 		else
 		{
-			$matched_ids = array();
-			foreach( $spx_results['matches'] as $match )
-			{
-				$matched_ids[] = $match['id'];
-			}
+			$matched_ids = $this->extract_sphinx_matches_ids( $spx_results );
 
 			$diff = array_diff( $matched_ids, $excluded_posts );
 			if ( count( $diff ) == 10 )
@@ -1150,14 +1140,8 @@ class GO_Sphinx_Test extends GO_Sphinx
 		}
 
 		// make sure ids from $posts_in are not in $results['matches']
-		$matched_post_ids = array();
-		if ( isset( $results['matches'] ) )
-		{
-			foreach( $results['matches'] as $match )
-			{
-				$matched_post_ids[] = $match['id'];
-			}
-		}
+		$matched_post_ids = $this->extract_sphinx_matches_ids( $results );
+
 		$test_failed = FALSE;
 		foreach ( $query_terms as $post_id => $term_obj )
 		{
@@ -1230,5 +1214,80 @@ class GO_Sphinx_Test extends GO_Sphinx
 		$this->compare_results( $wp_author_results, $sp_author_results );
 		echo "---\n\n";
 	}//END not_author_id_test	
+
+	/**
+	 * 15. Pick the first of those posts from #1 that has a category, then
+	 * pick the ten most recent posts in that category. The exemplar post
+	 * from #1 should be returned in this query.
+	 *
+	 * query var tested: category__in
+	 */
+	public function category_in_test()
+	{
+		$the_post = FALSE;
+		$category = FALSE;
+		foreach( $this->ten_most_recent_hits_wp as $post )
+		{
+			$terms = wp_get_object_terms( $post->ID, 'category' );
+			if ( ! empty( $terms ) )
+			{
+				$the_post = $post;
+				$category = $terms[0];
+				break;
+			}
+		}
+
+		if ( ( FALSE === $the_post) || ( FALSE === $category ) )
+		{
+			echo "post or category not found. cannot complete test.\n\n";
+			echo "---\n\n";
+			return;
+		}
+
+		$wp_results = new WP_Query(
+			array(
+				'post_type'      => 'any',
+				'post_status'    => 'publish',
+				'posts_per_page' => 10,
+				'orderby'        => 'date',
+				'order'          => 'DESC',
+				'category__in'   => $category->term_id,
+				'fields'         => 'ids',
+		) );
+
+		if ( ( $wp_results->post_count == 0 ) ||
+			 ! in_array( $the_post->ID, $wp_results->posts ) )
+		{
+			echo "did not find expected post ($the_post->ID) in WP_Query results. FAILED.\n\n";
+		}
+		else
+		{
+			echo "WP_Query results include expected post ($the_post->ID). PASSED\n\n";
+		}
+
+		// now with sphinx
+		$this->client = FALSE; // ensure we get a new instance
+		$client = $this->client();
+		$client->SetLimits( 0, 10, 1000 );
+		$client->SetSortMode( SPH_SORT_EXTENDED, 'post_date_gmt DESC' );
+		$client->SetMatchMode( SPH_MATCH_EXTENDED );
+		$client->SetFilter( 'tt_id', array( $category->term_taxonomy_id ) );
+		$sp_results = $client->Query( '@post_status publish' );
+
+		$sp_result_ids = $this->extract_sphinx_matches_ids( $sp_results );
+
+		if ( empty( $sp_result_ids ) ||
+			 ! in_array( $the_post->ID, $sp_result_ids ) )
+		{
+			echo "did not find expected post ($the_post->ID) in Sphinx results. FAILED.\n\n";
+		}
+		else
+		{
+			echo "Sphinx results include expected post ($the_post->ID). PASSED\n\n";
+		}
+
+		$this->compare_results( $wp_results->posts, $sp_result_ids );
+		echo "---\n\n";
+	}//END category_in_test
 
 }//END GO_Sphinx_Test
