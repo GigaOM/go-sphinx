@@ -32,7 +32,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 		echo "$this->test_count.\n";
 		$this->most_recent_by_terms_test( 10 );
 		++$this->test_count;
-
+/*
 		echo "$this->test_count.\n";
 		$this->most_recent_by_terms_test( 53 );
 		++$this->test_count;
@@ -80,9 +80,13 @@ class GO_Sphinx_Test extends GO_Sphinx
 		echo "$this->test_count.\n";
 		$this->not_author_id_test();
 		++$this->test_count;
+*/
+		echo "$this->test_count.\n";
+		$this->category_test( TRUE );
+		++$this->test_count;
 
 		echo "$this->test_count.\n";
-		$this->category_in_test();
+		$this->category_test( FALSE );
 		++$this->test_count;
 
 		echo "</pre>\n";
@@ -1220,9 +1224,16 @@ class GO_Sphinx_Test extends GO_Sphinx
 	 * pick the ten most recent posts in that category. The exemplar post
 	 * from #1 should be returned in this query.
 	 *
-	 * query var tested: category__in
+	 * 16. With the same category from #15, query for the ten most recent
+	 * posts not in that category. The exemplar post from #1 should not be
+	 * returned in the results.
+	 *
+	 * query var tested: category__in, category__not_in
+	 *
+	 * @param $category_in test with category__in query_var if TRUE, else
+	 *  test with category__not_in.
 	 */
-	public function category_in_test()
+	public function category_test( $category_in )
 	{
 		$the_post = FALSE;
 		$category = FALSE;
@@ -1244,6 +1255,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 			return;
 		}
 
+		$category_query_var = $category_in ? 'category__in' : 'category__not_in';
 		$wp_results = new WP_Query(
 			array(
 				'post_type'      => 'any',
@@ -1251,18 +1263,26 @@ class GO_Sphinx_Test extends GO_Sphinx
 				'posts_per_page' => 10,
 				'orderby'        => 'date',
 				'order'          => 'DESC',
-				'category__in'   => $category->term_id,
+				$category_query_var   => $category->term_id,
 				'fields'         => 'ids',
 		) );
 
 		if ( ( $wp_results->post_count == 0 ) ||
-			 ! in_array( $the_post->ID, $wp_results->posts ) )
+			 ( $category_in && ! in_array( $the_post->ID, $wp_results->posts ) ) ||
+			 ( ! $category_in && in_array( $the_post->ID, $wp_results->posts ) ) )
 		{
-			echo "did not find expected post ($the_post->ID) in WP_Query results. FAILED.\n\n";
+			if ( $category_in )
+			{
+				echo "did not find expected post ($the_post->ID) in WP_Query results. FAILED.\n\n";
+			}
+			else
+			{
+				echo "found unexpected post ($the_post->ID) in WP_Query results. FAILED.\n\n";
+			}
 		}
 		else
 		{
-			echo "WP_Query results include expected post ($the_post->ID). PASSED\n\n";
+			echo 'WP_Query results ' . ( $category_in ? 'included' : 'excluded' ) . " expected post ($the_post->ID). PASSED\n\n";
 		}
 
 		// now with sphinx
@@ -1271,19 +1291,27 @@ class GO_Sphinx_Test extends GO_Sphinx
 		$client->SetLimits( 0, 10, 1000 );
 		$client->SetSortMode( SPH_SORT_EXTENDED, 'post_date_gmt DESC' );
 		$client->SetMatchMode( SPH_MATCH_EXTENDED );
-		$client->SetFilter( 'tt_id', array( $category->term_taxonomy_id ) );
+		$client->SetFilter( 'tt_id', array( $category->term_taxonomy_id ), ! $category_in );
 		$sp_results = $client->Query( '@post_status publish' );
 
 		$sp_result_ids = $this->extract_sphinx_matches_ids( $sp_results );
 
 		if ( empty( $sp_result_ids ) ||
-			 ! in_array( $the_post->ID, $sp_result_ids ) )
+			 ( $category_in && ! in_array( $the_post->ID, $sp_result_ids ) ) ||
+			 ( ! $category_in && in_array( $the_post->ID, $sp_result_ids ) ) )
 		{
-			echo "did not find expected post ($the_post->ID) in Sphinx results. FAILED.\n\n";
+			if ( $category_in )
+			{
+				echo "did not find expected post ($the_post->ID) in Sphinx results. FAILED.\n\n";
+			}
+			else
+			{
+				echo "found unexpected post ($the_post->ID) in Sphinx results. FAILED.\n\n";
+			}
 		}
 		else
 		{
-			echo "Sphinx results include expected post ($the_post->ID). PASSED\n\n";
+			echo 'Sphinx results ' . ( $category_in ? 'included' : 'excluded' ) . " expected post ($the_post->ID). PASSED\n\n";
 		}
 
 		$this->compare_results( $wp_results->posts, $sp_result_ids );
