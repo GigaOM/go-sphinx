@@ -73,6 +73,14 @@ class GO_Sphinx_Test extends GO_Sphinx
 		$this->post_in_test();
 		++$this->test_count;
 
+		echo "$this->test_count.\n";
+		$this->author_ids_test();
+		++$this->test_count;
+
+		echo "$this->test_count.\n";
+		$this->not_author_id_test();
+		++$this->test_count;
+
 		echo "</pre>\n";
 		die;
 	}
@@ -476,6 +484,12 @@ class GO_Sphinx_Test extends GO_Sphinx
 	// compare wpq and spx results
 	public function compare_results( $wpq_results, $spx_results )
 	{
+		if ( ( $wpq_results === FALSE ) || ( $spx_results === FALSE ) )
+		{
+			echo "Comparing one or more FALSE results.\n\n";
+			return;
+		}
+
 		if ( count( $wpq_results ) > count( $spx_results ) )
 		{
 			$results_diff = array_diff( $wpq_results, $spx_results );
@@ -796,23 +810,37 @@ class GO_Sphinx_Test extends GO_Sphinx
 	 */
 	public function author_id_test()
 	{
-		//	do the wp version . . .
+		$wp_author_results = $this->wp_query_all_author_posts( array( $this->ten_most_recent_hits_wp[0]->post_author ) );
+
 		echo "\n";
-		$wp_author_results = $this->wp_query_all_author_posts( $this->ten_most_recent_hits_wp[0]->post_author );
-		echo "\n";
-		//	do the sphinx version . . .
-		$sp_author_results = $this->sphinx_query_all_author_posts( $this->ten_most_recent_hits_spx[0]['attrs']['post_author'] );
-		$this->compare_results( $wpq_results, $spx_results );		
+		$sp_author_results = $this->sphinx_query_all_author_posts( array( $this->ten_most_recent_hits_wp[0]->post_author ) );
+
+		$this->compare_results( $wp_author_results, $sp_author_results );
 		echo "---\n\n";
 	}//END author_id_test	
-	
-	public function wp_query_all_author_posts($author_id)
+
+	// @param $author_ids
+	public function wp_query_all_author_posts( $author_ids, $exclude = FALSE )
 	{
-		echo "WP_Query of all results for a given author" . '(' . $author_id . ')' . ":\n\n";
+		echo 'WP_Query of all results for author(s) (' . implode( ', ', $author_ids ) . "):\n\n";
+
+		if ( $exclude && ( 1 < count( $author_ids ) ) )
+		{
+			echo "cannot exclude more than one author id.\n";
+			return FALSE;
+		}
+		if ( $exclude )
+		{
+			$author_ids_str = '-'.$author_ids[0];
+		}
+		else
+		{
+			$author_ids_str = implode( ',', $author_ids );
+		}
 
 		$results = new WP_Query(
 			array(
-				'author'         => $author_id,
+				'author'         => $author_ids_str,
 				'post_type'      => 'any',
 				'post_status'    => 'publish',
 				'posts_per_page' => 10,
@@ -837,16 +865,17 @@ class GO_Sphinx_Test extends GO_Sphinx
 		}
 	}//END wp_query_all_author_posts
 	
-	public function sphinx_query_all_author_posts($author_id)
+	public function sphinx_query_all_author_posts( $author_ids, $exclude = FALSE )
 	{
-		echo "Sphinx query of all results for a given author" . '(' . $author_id . ')' . ":\n\n";
+		echo 'Sphinx query of all results for author(s) (' . implode( ', ', $author_ids ) . "):\n\n";
 
 		$this->client = FALSE; // ensure we get a new instance
 		$client = $this->client();
 		$client->SetLimits( 0, 10, 1000 );
 		$client->SetSortMode( SPH_SORT_EXTENDED, 'post_date_gmt DESC' );
 		$client->SetMatchMode( SPH_MATCH_EXTENDED );
-		$client->SetFilter( 'post_author', array( $author_id ) );
+		$client->SetFilter( 'post_author', $author_ids, $exclude );
+
 		$results = $client->Query( '@post_status publish'); // @post_author ' . $author_id 
 		
 		if ( FALSE !== $results )
@@ -1140,6 +1169,66 @@ class GO_Sphinx_Test extends GO_Sphinx
 		}
 
 		echo 'Sphinx query for test ' . $this->test_count . ' ' . ( ( $test_failed ) ? "FAILED" : "PASSED" ) . ".\n\n";
+		echo "---\n\n";
 	}//END post_in_test
+
+	/**
+	 * 13. Using two author IDs from #1, do a new query for all results by
+	 * those authors. The MySQL and Sphinx results should be indistinguishable
+	 *
+	 * query var tested: author (multi-value)
+	 */
+	public function author_ids_test()
+	{
+		// find two author ids
+		$author_ids = array();
+		foreach( $this->ten_most_recent_hits_wp as $post )
+		{
+			if ( ! in_array( $post->post_author, $author_ids ) )
+			{
+				$author_ids[] = $post->post_author;
+				if ( count( $author_ids ) >= 2 )
+				{
+					break;
+				}
+			}
+		}
+
+		$wp_author_results = $this->wp_query_all_author_posts( $author_ids );
+
+		echo "\n";
+
+		$sp_author_results = $this->sphinx_query_all_author_posts( $author_ids );
+		$this->compare_results( $wp_author_results, $sp_author_results );
+		echo "---\n\n";
+	}//END author_ids_test	
+
+	/**
+	 * 14. Using an author ID from #1, do a new query for all results not
+	 * by that author. The MySQL and Sphinx results should be indistinguishable
+	 *
+	 * query var tested: author (exclude)
+	 */
+	public function not_author_id_test()
+	{
+		$post = $this->ten_most_recent_hits_wp[2];
+		$author_id = $post->post_author;
+
+		$wp_author_results = $this->wp_query_all_author_posts( array( $author_id ), TRUE );
+		if ( in_array( $post->ID, $wp_author_results ) )
+		{
+			echo "post $post->ID should not be in query results\n";
+		}
+		echo "\n";
+
+		$sp_author_results = $this->sphinx_query_all_author_posts( array( $author_id ), TRUE );
+		if ( in_array( $post->ID, $sp_author_results ) )
+		{
+			echo "post $post->ID should not be in query results\n";
+		}
+
+		$this->compare_results( $wp_author_results, $sp_author_results );
+		echo "---\n\n";
+	}//END not_author_id_test	
 
 }//END GO_Sphinx_Test
