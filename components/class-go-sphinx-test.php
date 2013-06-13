@@ -32,7 +32,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 		echo "$this->test_count.\n";
 		$this->most_recent_by_terms_test( 10 );
 		++$this->test_count;
-/*
+
 		echo "$this->test_count.\n";
 		$this->most_recent_by_terms_test( 53 );
 		++$this->test_count;
@@ -80,13 +80,17 @@ class GO_Sphinx_Test extends GO_Sphinx
 		echo "$this->test_count.\n";
 		$this->not_author_id_test();
 		++$this->test_count;
-*/
+
 		echo "$this->test_count.\n";
 		$this->category_test( TRUE );
 		++$this->test_count;
 
 		echo "$this->test_count.\n";
 		$this->category_test( FALSE );
+		++$this->test_count;
+
+		echo "$this->test_count.\n";
+		$this->category_and_test( FALSE );
 		++$this->test_count;
 
 		echo "</pre>\n";
@@ -1248,7 +1252,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 			}
 		}
 
-		if ( ( FALSE === $the_post) || ( FALSE === $category ) )
+		if ( FALSE === $the_post)
 		{
 			echo "post or category not found. cannot complete test.\n\n";
 			echo "---\n\n";
@@ -1316,6 +1320,93 @@ class GO_Sphinx_Test extends GO_Sphinx
 
 		$this->compare_results( $wp_results->posts, $sp_result_ids );
 		echo "---\n\n";
-	}//END category_in_test
+	}//END category_test
+
+	/**
+	 * 17. Pick two categories from one of the posts from #1, then query
+	 * for the ten most recent posts in those two categories. The examplar
+	 * post from #1 should be in the results and the WP and Sphinx results
+	 * should match.
+	 *
+	 * query var tested: category__and
+	 */
+	public function category_and_test( $category_in )
+	{
+		$the_post = FALSE;
+		$categories = array();
+		foreach( $this->ten_most_recent_hits_wp as $post )
+		{
+			$terms = wp_get_object_terms( $post->ID, 'category' );
+			if ( ! empty( $terms ) && 2 <= count( $terms ) )
+			{
+				$the_post = $post;
+				$category = $terms;
+				break;
+			}
+		}
+
+		if ( FALSE === $the_post)
+		{
+			echo "post or category not found. cannot complete test.\n\n";
+			echo "---\n\n";
+			return;
+		}
+
+		$category_ids = array();
+		$category_ttids = array();
+		foreach( $categories as $category_term )
+		{
+			$category_ids[] = $category_term->term_id;
+			$category_ttids[] = $category_term->term_taxonomy_id;
+		}
+
+		$wp_results = new WP_Query(
+			array(
+				'post_type'      => 'any',
+				'post_status'    => 'publish',
+				'posts_per_page' => 10,
+				'orderby'        => 'date',
+				'order'          => 'DESC',
+				'category__and'  => $category_ids,
+				'fields'         => 'ids',
+		) );
+
+		if ( ( $wp_results->post_count == 0 ) ||
+			 ! in_array( $the_post->ID, $wp_results->posts ) )
+		{
+			echo "did not find expected post ($the_post->ID) in WP_Query results. FAILED.\n\n";
+		}
+		else
+		{
+			echo "WP_Query results included the expected post ($the_post->ID). PASSED\n\n";
+		}
+
+		// now with sphinx
+		$this->client = FALSE; // ensure we get a new instance
+		$client = $this->client();
+		$client->SetLimits( 0, 10, 1000 );
+		$client->SetSortMode( SPH_SORT_EXTENDED, 'post_date_gmt DESC' );
+		$client->SetMatchMode( SPH_MATCH_EXTENDED );
+		foreach( $category_ttids as $ttid )
+		{
+			$client->SetFilter( 'tt_id', array( $ttid ) );
+		}
+		$sp_results = $client->Query( '@post_status publish' );
+
+		$sp_result_ids = $this->extract_sphinx_matches_ids( $sp_results );
+
+		if ( empty( $sp_result_ids ) ||
+			 ! in_array( $the_post->ID, $sp_result_ids ) )
+		{
+			echo "did not find expected post ($the_post->ID) in Sphinx results. FAILED.\n\n";
+		}
+		else
+		{
+			echo "Sphinx results included the expected post ($the_post->ID). PASSED\n\n";
+		}
+
+		$this->compare_results( $wp_results->posts, $sp_result_ids );
+		echo "---\n\n";
+	}//END category_and_test
 
 }//END GO_Sphinx_Test
