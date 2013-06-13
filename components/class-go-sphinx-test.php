@@ -140,7 +140,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 		++$this->test_count;
 
 		echo "$this->test_count.\n";
-		if ( ! $this->category_and_test( FALSE ) )
+		if ( ! $this->category_and_test() )
 		{
 			++$num_failed;
 		}
@@ -159,6 +159,12 @@ class GO_Sphinx_Test extends GO_Sphinx
 			++$num_failed;
 		}
 		++$this->test_count;
+
+		echo "$this->test_count.\n";
+		if ( ! $this->tag_and_test() )
+		{
+			++$num_failed;
+		}
 
 		echo "</pre>\n";
 
@@ -1456,7 +1462,6 @@ class GO_Sphinx_Test extends GO_Sphinx
 			return FALSE;
 		}
 
-		$the_post = FALSE;
 		$the_term = FALSE;
 
 		$terms = get_terms( array( $taxonomy ), array(
@@ -1512,8 +1517,10 @@ class GO_Sphinx_Test extends GO_Sphinx
 			echo "did not find any post from WP_Query. FAILED.\n\n";
 			$test_failed = TRUE;
 		}
-
-		echo 'WP_Query results: ' . implode( ', ', $wp_results->posts ). "\n\n";
+		else
+		{
+			echo 'WP_Query results: ' . implode( ', ', $wp_results->posts ). "\n\n";
+		}
 
 		// now with sphinx
 		$this->client = FALSE; // get a new instance
@@ -1553,7 +1560,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 	 * @retval TRUE if the test passed.
 	 * @retval FALSE if the test failed or if we encountered an error.
 	 */
-	public function category_and_test( $category_in )
+	public function category_and_test()
 	{
 		$the_post = FALSE;
 		$categories = array();
@@ -1637,4 +1644,95 @@ class GO_Sphinx_Test extends GO_Sphinx
 		return ( ! $test_failed );
 	}//END category_and_test
 
+	/**
+	 * 20. Pick two tags from the ten most frequently used tags and query
+	 * for the most recent ten posts having both of those tags. the WP_Query
+	 * and Sphinx results should match exactly
+	 *
+	 * query var tested: tag__and
+	 *
+	 * @retval TRUE if the test passed.
+	 * @retval FALSE if the test failed or if we encountered an error.
+	 */
+	public function tag_and_test()
+	{
+		$terms = get_terms( array( 'post_tag' ), array(
+								'orderby' => 'count',
+								'order'   => 'DESC',
+						  ) );
+
+		if ( empty( $terms ) || ( 2 > count( $terms ) ) )
+		{
+			echo "not enough post_tags found. cannot complete test.\n\n";
+			echo "---\n\n";
+			return FALSE;
+		}
+
+		// take the 3rd and 5th most popular tags if possible. else just take
+		// the first two.
+		if ( 5 <= count( $terms ) )
+		{
+			$the_terms = array( $terms[2], $terms[4] );
+		}
+		else
+		{
+			$the_terms = array( $terms[0], $terms[1] );
+		}
+		$term_ids = array( $the_terms[0]->term_id, $the_terms[1]->term_id );
+		$term_names = array( $the_terms[0]->name, $the_terms[1]->name );
+		$ttids = array( $the_terms[0]->term_taxonomy_id, $the_terms[1]->term_taxonomy_id );
+
+		echo 'comparing search results on terms ' . implode( ' and ', $term_ids ) . ' ("' . implode( '" and "', $term_names ) . "\")\n\n";
+
+		$wp_results = new WP_Query(
+			array(
+				'post_type'      => 'any',
+				'post_status'    => 'publish',
+				'posts_per_page' => 10,
+				'orderby'        => 'date',
+				'order'          => 'DESC',
+				'tag__and'       => $term_ids,
+				'fields'         => 'ids',
+		) );
+
+		$test_failed = FALSE;
+		if ( $wp_results->post_count == 0 )
+		{
+			echo "did not find any post from WP_Query. FAILED.\n\n";
+			$test_failed = TRUE;
+		}
+		else
+		{
+			echo 'WP_Query results: ' . implode( ', ', $wp_results->posts ). "\n\n";
+		}
+
+		// now with sphinx
+		$this->client = FALSE; // get a new instance
+		$client = $this->client();
+		$client->SetLimits( 0, 10, 1000 );
+		$client->SetSortMode( SPH_SORT_EXTENDED, 'post_date_gmt DESC' );
+		foreach( $ttids as $ttid )
+		{
+			$client->SetFilter( 'tt_id', array( $ttid ) );
+		}
+		$client->SetMatchMode( SPH_MATCH_EXTENDED );
+		$sp_results = $client->Query( '@post_status publish' );
+
+		$sp_result_ids = $this->extract_sphinx_matches_ids( $sp_results );
+
+		if ( empty( $sp_result_ids ) )
+		{
+			echo "did not find any post from Sphinx query. FAILED.\n\n";
+			$test_failed = TRUE;
+		}
+		else
+		{
+			echo '  Sphinx results: ' . implode( ', ', $sp_result_ids ). "\n\n";
+		}
+
+		$test_failed = ( $test_failed || ( ! $this->compare_results( $wp_results->posts, $sp_result_ids ) ) );
+		echo "---\n\n";
+
+		return ( ! $test_failed );
+	}
 }//END GO_Sphinx_Test
