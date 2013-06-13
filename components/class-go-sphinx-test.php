@@ -179,6 +179,20 @@ class GO_Sphinx_Test extends GO_Sphinx
 		{
 			++$num_failed;
 		}
+		++$this->test_count;
+
+		echo "$this->test_count.\n";
+		if ( ! $this->ordering_tests() )
+		{
+			++$num_failed;
+		}
+		++$this->test_count;
+
+		echo "$this->test_count.\n";
+		if ( ! $this->post_parent_test() )
+		{
+			++$num_failed;
+		}
 
 		echo "</pre>\n";
 
@@ -205,11 +219,20 @@ class GO_Sphinx_Test extends GO_Sphinx
 	 */
 	public function ten_most_recent_posts_test()
 	{
-		// these tests also populate $this->ten_most_recent_hits_wp and
-		// $this->ten_most_recent_hits_spx which we'll need for other tests
-		$wpq_results = $this->wp_query_ten_most_recent_posts();
-		$spx_results = $this->sphinx_ten_most_recent_posts();
-		$res = $this->compare_results( $wpq_results, $spx_results );
+		// also populate $this->ten_most_recent_hits_wp and
+		// $this->ten_most_recent_hits_spx for some tests later
+		$this->ten_most_recent_hits_wp = $this->wp_query_ten_posts( 'date', 'DESC' );
+		$wpq_result_ids = array();
+		foreach ( $this->ten_most_recent_hits_wp as $post )
+		{
+			$wpq_result_ids[] = $post->ID;
+		}
+
+		$this->ten_most_recent_hits_spx = $this->sphinx_ten_posts( 'post_date_gmt', 'DESC' );
+		$spx_result_ids = $this->extract_sphinx_matches_ids( $this->ten_most_recent_hits_spx );
+
+		$res = $this->compare_results( $wpq_result_ids, $spx_result_ids );
+
 		echo "---\n\n";
 		return $res;
 	}//END ten_most_recent_posts_test
@@ -347,34 +370,29 @@ class GO_Sphinx_Test extends GO_Sphinx
 		return $res;
 	}//END most_recent_by_two_terms_paged_test
 
-	public function wp_query_ten_most_recent_posts()
+	public function wp_query_ten_posts( $orderby, $order )
 	{
-		echo "WP_Query of ten most recent posts:\n\n";
+		echo "WP_Query of ten posts ordered by $orderby, $order:\n\n";
 
 		$results = new WP_Query(
 			array(
 				'post_type'      => 'any',
 				'post_status'    => 'publish',
 				'posts_per_page' => 10,
-				'orderby'        => 'date', // or 'modified'?
-				'order'          => 'DESC',
+				'orderby'        => $orderby,
+				'order'          => $order,
 
 		) );
 
 		if ( $results->posts )
 		{
-			$this->ten_most_recent_hits_wp = $results->posts;
-		}
-
-		if ( $this->ten_most_recent_hits_wp )
-		{
 			$ids = array();
-			foreach ( $this->ten_most_recent_hits_wp as $hit )
+			foreach ( $results->posts as $hit )
 			{
 				$ids[] = $hit->ID;
 			}
 			echo implode( ', ', $ids ) . "\n\n";
-			return $ids;
+			return $results->posts;
 		}
 		else
 		{
@@ -383,23 +401,32 @@ class GO_Sphinx_Test extends GO_Sphinx
 		}
 	}//END wp_query_ten_most_recent_posts
 
-	public function sphinx_ten_most_recent_posts()
+	public function sphinx_ten_posts( $orderby, $order )
 	{
-		echo "\nSphinx query of ten most recent posts:\n\n";
+		echo "Sphinx query of ten posts ordered by $orderby, $order:\n\n";
 
 		$this->client = FALSE; // ensure we get a new instance
 		$client = $this->client();
 		$client->SetLimits( 0, 10, 1000 );
-		$client->SetSortMode( SPH_SORT_EXTENDED, 'post_date_gmt DESC' );
+		if ( 'none' != $orderby )
+		{
+			$client->SetSortMode( SPH_SORT_EXTENDED, $orderby . ' ' . $order );
+			if ( 'comment_count' == $orderby )
+			{
+				// add an additional sort ordering when what we sort
+				// on have lots of collisions (such as comment counts of
+				// 0 or 1).
+				$client->SetSortMode( SPH_SORT_EXTENDED, '@id ASC' );
+			}
+		}
 		$client->SetMatchMode( SPH_MATCH_EXTENDED );
 		$results = $client->Query( '@post_status publish' );
 
 		if ( FALSE !== $results )
 		{
-			$this->ten_most_recent_hits_spx = $results['matches'];
 			$ids = $this->extract_sphinx_matches_ids( $results );
 			echo implode( ', ', $ids ) . "\n\n";
-			return $ids;
+			return $results;
 		}
 		else
 		{
@@ -1764,7 +1791,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 		echo "---\n\n";
 
 		return ( ! $test_failed );
-	}
+	}//END tag_and_test
 
 	/**
 	 * 21. similar to #18 but use tag_slug__in
@@ -1777,7 +1804,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 	public function tag_slug_in_test()
 	{
 		return $this->terms_test( 'post_tag', TRUE, TRUE );
-	}
+	}//END tag_slug_in_test
 
 	/**
 	 * 22. similar to #20 but use tag_slug__and
@@ -1790,6 +1817,185 @@ class GO_Sphinx_Test extends GO_Sphinx
 	public function tag_slug_and_test()
 	{
 		return $this->tag_and_test( TRUE );
-	}
+	}//END tag_slug_and_test
+
+	/**
+	 * 23. Search for ten published posts in these ordering: none, rand, ID,
+	 * modified, parent and comment count.
+	 * WP and Sphinx results should be identical for ID, modified, parent and
+	 * comment count. for ordering of none and rand we expect the two result
+	 * sets to differ but it’s possible for them to match sometimes (unlikely
+	 * though).
+	 *
+	 * (title is not currently indexed so we cannot test it against sphinx yet)
+	 *
+	 * query var tested: order, orderby none; rand; ID; modified; parent;
+	 * comment count
+	 *
+	 * @retval TRUE if the test passed.
+	 * @retval FALSE if the test failed or if we encountered an error.
+	 */
+	public function ordering_tests()
+	{
+		$failed = FALSE;
+
+		/* each element of this array contains three elements:
+		 * params for the wp_query test, params for the sphinx params, and
+		 * a flag to indicate whether the results should match or not */
+		$ordering_tests = array(
+			array(
+				'wp'    => array( 'none', 'DESC' ),
+				'sp'    => array( 'none', 'DESC' ),
+				'match' => FALSE,
+				),
+			array(
+				'wp'    => array( 'rand', 'ASC' ),
+				'sp'    => array( '@random', 'ASC' ),
+				'match' => FALSE,
+				),
+			array(
+				'wp'    => array( 'ID', 'DESC' ),
+				'sp'    => array( '@id', 'DESC' ),
+				'match' => TRUE,
+				),
+			array(
+				'wp'    => array( 'modified', 'ASC' ),
+				'sp'    => array( 'post_modified_gmt', 'ASC' ),
+				'match' => TRUE,
+				),
+			array(
+				'wp'    => array( 'parent', 'DESC' ),
+				'sp'    => array( 'post_parent', 'DESC' ),
+				'match' => TRUE,
+				),
+			array(
+				'wp'    => array( 'comment_count ID', 'ASC' ),
+				'sp'    => array( 'comment_count', 'ASC' ),
+				'match' => TRUE,
+				),
+		);
+
+		foreach( $ordering_tests as $params )
+		{
+			$wpq_results = $this->wp_query_ten_posts( $params['wp'][0], $params['wp'][1] );
+			$wpq_results_ids = array();
+			foreach ( $wpq_results as $post )
+			{
+				$wpq_results_ids[] = $post->ID;
+			}
+			$spx_results = $this->sphinx_ten_posts( $params['sp'][0], $params['sp'][1] );
+			$spx_results_ids = $this->extract_sphinx_matches_ids( $spx_results );
+			if ( 10 > count( $wpq_results_ids ) )
+			{
+				$failed = TRUE;
+				echo "did not get all ten posts from WP_Query\n";
+			}
+			elseif ( 10 > count( $spx_results_ids ) )
+			{
+				$failed = TRUE;
+				echo "did not get all ten posts from Sphinx\n";
+			}
+
+			if ( $params['match'] )
+			{
+				if ( 0 == count( array_diff( $wpq_results_ids, $spx_results_ids ) ) )
+				{
+					echo "WP_Query and Sphinx results match as expected. PASSED.\n";
+				}
+				else
+				{
+					$failed = TRUE;
+					echo "WP_Query and Sphinx results do not match. FAILED.\n";
+				}
+			}//END if
+			else
+			{
+				if ( 0 == count( array_diff( $wpq_results_ids, $spx_results_ids ) ) )
+				{
+					$failed = TRUE;
+					echo "WP_Query and Sphinx results match for random ordering. this is very unlikely. FAILED.\n";
+				}
+				else
+				{
+					echo "WP_Query and Sphinx results do not match. This is expected. PASSED.\n";
+				}
+			}//END else
+			echo "\n-\n\n";
+		}//END foreach
+
+		
+		return ( ! $failed );
+	}//END ordering_tests
+
+	/**
+	 * 24. Using the posts from #1 (ten most recent posts), find the first
+	 * post with a parent, and then search for up to ten child posts by
+	 * that parent, sort by post ID DESC.
+	 * WP and Sphinx results should match
+	 *
+	 * query var tested: post_parent
+	 */
+	public function post_parent_test()
+	{
+		$the_post = FALSE;
+		foreach( $this->ten_most_recent_hits_wp as $post )
+		{
+			if ( isset( $post->post_parent ) && ( 0 < $post->post_parent ) )
+			{
+				$the_post = $post;
+				break;
+			}
+		}
+
+		if ( FALSE == $the_post )
+		{
+			echo "unable to find a parent id. aborting test.\n\n---\n\n";
+			return FALSE;
+		}
+
+		// WP query
+		$wp_results = new WP_Query(
+			array(
+				'post_type'      => 'any',
+				'post_status'    => 'publish',
+				'posts_per_page' => 10,
+				'orderby'        => 'ID',
+				'order'          => 'DESC',
+				'post_parent'    => $the_post->post_parent,
+				'fields'         => 'ids',
+		) );
+
+		if ( 0 == $wp_results->post_count )
+		{
+			echo "no WP_Query results. FAILED.\n\n---\n\n";
+			return FALSE;
+		}
+		echo 'WP_Query of child posts of ' . $the_post->post_parent . ': ' . implode( ', ', $wp_results->posts ) . "\n\n";
+
+		// sphinx
+		$this->client = FALSE; // get a new instance
+		$client = $this->client();
+		$client->SetLimits( 0, 10, 1000 );
+		$client->SetSortMode( SPH_SORT_EXTENDED, '@id DESC' );
+		$client->SetFilter( 'post_parent', array( $the_post->post_parent ) );
+		$client->SetMatchMode( SPH_MATCH_EXTENDED );
+		$sp_results = $client->Query( '@post_status publish' );
+
+		if ( ! isset( $sp_results['matches'] ) ||
+			 ( 0 == count( $sp_results['matches'] ) ) )
+		{
+			echo "no Sphinx results. FAILED.\n\n---\n\n";
+			return FALSE;
+		}
+
+		$sp_result_ids = $this->extract_sphinx_matches_ids( $sp_results );
+
+		echo 'Sphinx query of child posts of ' . $the_post->post_parent . ': ' . implode( ', ', $sp_result_ids ) . "\n\n";
+
+		$res = $this->compare_results( $wp_results->posts, $sp_result_ids );
+		echo "---\n\n";
+
+		return $res;
+	}//END post_parent_test
 
 }//END GO_Sphinx_Test
