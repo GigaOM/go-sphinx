@@ -147,21 +147,35 @@ class GO_Sphinx_Test extends GO_Sphinx
 		++$this->test_count;
 
 		echo "$this->test_count.\n";
-		if ( ! $this->tags_in_test() )
+		if ( ! $this->tag_in_test() )
 		{
 			++$num_failed;
 		}
 		++$this->test_count;
 
 		echo "$this->test_count.\n";
-		if ( ! $this->tags_not_in_test() )
+		if ( ! $this->tag_not_in_test() )
 		{
 			++$num_failed;
 		}
 		++$this->test_count;
 
 		echo "$this->test_count.\n";
-		if ( ! $this->tag_and_test() )
+		if ( ! $this->tag_and_test( FALSE ) )
+		{
+			++$num_failed;
+		}
+		++$this->test_count;
+
+		echo "$this->test_count.\n";
+		if ( ! $this->tag_slug_in_test() )
+		{
+			++$num_failed;
+		}
+		++$this->test_count;
+
+		echo "$this->test_count.\n";
+		if ( ! $this->tag_slug_and_test() )
 		{
 			++$num_failed;
 		}
@@ -1401,7 +1415,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 	 */
 	public function category_in_test()
 	{
-		return $this->terms_test( 'category', TRUE );
+		return $this->terms_test( 'category', TRUE, FALSE );
 	}
 
 	/**
@@ -1416,7 +1430,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 	 */
 	public function category_not_in_test()
 	{
-		return $this->terms_test( 'category', FALSE );
+		return $this->terms_test( 'category', FALSE, FALSE );
 	}
 
 	/**
@@ -1427,9 +1441,9 @@ class GO_Sphinx_Test extends GO_Sphinx
 	 * @retval TRUE if the test passed.
 	 * @retval FALSE if the test failed or if we encountered an error.
 	 */
-	public function tags_in_test()
+	public function tag_in_test()
 	{
-		return $this->terms_test( 'post_tag', TRUE );
+		return $this->terms_test( 'post_tag', TRUE, FALSE );
 	}
 
 	/**
@@ -1440,9 +1454,9 @@ class GO_Sphinx_Test extends GO_Sphinx
 	 * @retval TRUE if the test passed.
 	 * @retval FALSE if the test failed or if we encountered an error.
 	 */
-	public function tags_not_in_test()
+	public function tag_not_in_test()
 	{
-		return $this->terms_test( 'post_tag', FALSE );
+		return $this->terms_test( 'post_tag', FALSE, FALSE );
 	}
 
 	/*
@@ -1450,11 +1464,12 @@ class GO_Sphinx_Test extends GO_Sphinx
 	 *  'post_tag' are supported.
 	 * @param $include query for posts the includes the taxonomy term
 	 *  if TRUE. else query for posts without the taxonomy term.
+	 * @param $use_slugs use tag slugs instead of id for the WP_Query
 	 *
 	 * @retval TRUE if the test passed.
 	 * @retval FALSE if the test failed or if we encountered an error.
 	 */
-	public function terms_test( $taxonomy, $include )
+	public function terms_test( $taxonomy, $include, $use_slugs )
 	{
 		if ( ( $taxonomy != 'category' ) && ( $taxonomy != 'post_tag' ) )
 		{
@@ -1493,7 +1508,14 @@ class GO_Sphinx_Test extends GO_Sphinx
 		}
 		else
 		{
-			$query_var = $include ? 'tag__in' : 'tag__not_in';
+			if ( $use_slugs )
+			{
+				$query_var = 'tag_slug__in';
+			}
+			else
+			{
+				$query_var = $include ? 'tag__in' : 'tag__not_in';
+			}
 		}
 
 		$test_type = $include ? '' : 'of "not_in" search ';
@@ -1507,7 +1529,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 				'posts_per_page' => 10,
 				'orderby'        => 'date',
 				'order'          => 'DESC',
-				$query_var       => $the_term->term_id,
+				$query_var       => $use_slugs ? $the_term->slug : $the_term->term_id,
 				'fields'         => 'ids',
 		) );
 
@@ -1654,7 +1676,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 	 * @retval TRUE if the test passed.
 	 * @retval FALSE if the test failed or if we encountered an error.
 	 */
-	public function tag_and_test()
+	public function tag_and_test( $use_slugs )
 	{
 		$terms = get_terms( array( 'post_tag' ), array(
 								'orderby' => 'count',
@@ -1678,11 +1700,20 @@ class GO_Sphinx_Test extends GO_Sphinx
 		{
 			$the_terms = array( $terms[0], $terms[1] );
 		}
-		$term_ids = array( $the_terms[0]->term_id, $the_terms[1]->term_id );
-		$term_names = array( $the_terms[0]->name, $the_terms[1]->name );
-		$ttids = array( $the_terms[0]->term_taxonomy_id, $the_terms[1]->term_taxonomy_id );
 
-		echo 'comparing search results on terms ' . implode( ' and ', $term_ids ) . ' ("' . implode( '" and "', $term_names ) . "\")\n\n";
+		if ( $use_slugs )
+		{
+			$query_var = 'tag_slug__and';
+			$query_terms = array( $the_terms[0]->slug, $the_terms[1]->slug );
+		}
+		else
+		{
+			$query_var = 'tag__and';
+			$query_terms = array( $the_terms[0]->term_id, $the_terms[1]->term_id );
+		}
+		$term_names = '"' . $the_terms[0]->name . '" and "' . $the_terms[1]->name . '"';
+
+		echo 'comparing search results on terms ' . implode( ' and ', $query_terms ) . " ($term_names)\n\n";
 
 		$wp_results = new WP_Query(
 			array(
@@ -1691,7 +1722,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 				'posts_per_page' => 10,
 				'orderby'        => 'date',
 				'order'          => 'DESC',
-				'tag__and'       => $term_ids,
+				$query_var       => $query_terms,
 				'fields'         => 'ids',
 		) );
 
@@ -1711,10 +1742,9 @@ class GO_Sphinx_Test extends GO_Sphinx
 		$client = $this->client();
 		$client->SetLimits( 0, 10, 1000 );
 		$client->SetSortMode( SPH_SORT_EXTENDED, 'post_date_gmt DESC' );
-		foreach( $ttids as $ttid )
-		{
-			$client->SetFilter( 'tt_id', array( $ttid ) );
-		}
+		$client->SetFilter( 'tt_id', array( $the_terms[0]->term_taxonomy_id ) );
+		$client->SetFilter( 'tt_id', array( $the_terms[1]->term_taxonomy_id ) );
+
 		$client->SetMatchMode( SPH_MATCH_EXTENDED );
 		$sp_results = $client->Query( '@post_status publish' );
 
@@ -1735,4 +1765,31 @@ class GO_Sphinx_Test extends GO_Sphinx
 
 		return ( ! $test_failed );
 	}
+
+	/**
+	 * 21. similar to #18 but use tag_slug__in
+	 *
+	 * query var tested: tag_slug__in
+	 *
+	 * @retval TRUE if the test passed.
+	 * @retval FALSE if the test failed or if we encountered an error.
+	 */
+	public function tag_slug_in_test()
+	{
+		return $this->terms_test( 'post_tag', TRUE, TRUE );
+	}
+
+	/**
+	 * 22. similar to #20 but use tag_slug__and
+	 *
+	 * query var tested: tag_slug__and
+	 *
+	 * @retval TRUE if the test passed.
+	 * @retval FALSE if the test failed or if we encountered an error.
+	 */
+	public function tag_slug_and_test()
+	{
+		return $this->tag_and_test( TRUE );
+	}
+
 }//END GO_Sphinx_Test
