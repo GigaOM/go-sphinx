@@ -1,6 +1,6 @@
 <?php
 
-//require_once('wlog.php');
+require_once('wlog.php');
 
 class GO_Sphinx
 {
@@ -35,6 +35,10 @@ class GO_Sphinx
 
 	public function client( $config = array() )
 	{
+		// TODO: cache client by query params -- we can't simply
+		// reuse the same client if another caller has set some
+		// of its search params or it would affect the next search
+		// in unexpected ways.
 		if ( ! $this->client || ! empty( $config ) )
 		{
 			require_once __DIR__ . '/externals/sphinxapi.php';
@@ -51,6 +55,7 @@ class GO_Sphinx
 			$this->client->SetConnectTimeout( $config['timeout'] );
 			$this->client->SetArrayResult( $config['arrayresult'] );
 		}
+		// TODO: else set up the client with info from $config
 
 		return $this->client;
 	}
@@ -124,9 +129,9 @@ class GO_Sphinx
 	{
 		//wlog( 'request: ' . print_r($request, true));
 		//wlog( 'wp_query: ' . print_r($wp_query, true));
+		$this->use_sphinx = TRUE;
 		return $request;
 	}
-
 
 	// returns TRUE if we want the query to be "split", which means
 	// WP will first get the result post ids, and then look up the
@@ -134,29 +139,44 @@ class GO_Sphinx
 	// use sphinx for the search results
 	public function split_the_query( $split_the_query, $wp_query )
 	{
-		if ( ( 'nav_menu_bar' != $wp_query->query_vars['post_type'] ) &&
-			 ( 'nav_menu_item' != $wp_query->query_vars['post_type'] ) &&
-			 ( ! empty( $wp_query->query ) ) )
-		{
-			//wlog('split_the_query: ' . ( $split_the_query ? 'TRUE' : 'FALSE'));
-		}
-
 		// if we can process this query then return TRUE for further
 		// processing
-		if ( empty( $wp_query->query_vars['post_type']) )
+		if ( $this->can_use_sphinx( $wp_query ) )
 		{
 			return TRUE;
 		}
+
+		$this->use_sphinx = FALSE;
+
 		return $split_the_query;
 	}
 
 	// replace the request (SQL) to come up with search result post ids
 	public function posts_request_ids( $request, $wp_query )
 	{
-		if ( ! empty( $wp_query->query ) &&
-			 empty( $wp_query->query_vars['post_type'] ) )
+
+wlog( $wp_query );
+
+		if ( $this->use_sphinx )
 		{
-			return 'SELECT 176060 AS ID UNION ALL SELECT 175439';
+			// return a SQL query that encodes the sphinx search results like:
+			// SELECT 176060 AS ID UNION ALL SELECT 175439 UNION ALL SELECT ...
+			$results = $this->sphinx_query( $request, $wp_query );
+			if ( 0 < count( $results ) )
+			{
+				$request = 'SELECT ' . $results[0] . ' AS ID';
+				$results = array_slice( $results, 1 );
+				if ( ! empty( $results ) )
+				{
+					$request = $request . ' UNION ALL SELECT ' . implode( ' UNION ALL SELECT ', $results );
+				}
+			}
+			else
+			{
+				// technically this should be wp_3_posts, but i'm not sure
+				// if wp_3_posts will always be there or not.
+				$request = 'SELECT ID FROM wp_posts WHERE 1 = 0';
+			}
 		}
 		return $request;
 	}
@@ -180,11 +200,134 @@ class GO_Sphinx
 	// pagination.
 	public function found_posts( $found_posts, $wp_query )
 	{
-		if ( 'nav_menu_item' != $wp_query->query_vars['post_type'] )
+		if ( $this->use_sphinx && $this->results )
 		{
-			//wlog('found_posts: ' . print_r( $found_posts, TRUE ) );
+			$found_posts = $this->results['total_found'];
 		}
 		return $found_posts;
+	}
+
+	// check if we can use sphinx for this wp_query
+	public function can_use_sphinx( $wp_query )
+	{
+		if ( isset( $_GET['no_sphinx'] ) )
+		{
+			return FALSE;
+		}
+
+		// TODO: implement the actual checks. for now this is just accepts
+		// simple company searches to test how to inject sphinx results
+		// into WP_Query results
+		if ( ! empty( $wp_query->query ) &&
+			 empty( $wp_query->query_vars['post_type']) &&
+			 ! empty( $wp_query->tax_query->queries ) &&
+			 isset( $wp_query->query_vars['company'] ) )
+		{
+			return TRUE;
+		}
+
+		return FALSE;
+	}
+
+	// perform a sphinx query that's equivalent to the $wp_query
+	public function sphinx_query( $request, $wp_query )
+	{
+		//wlog( $wp_query );
+
+		$ids = array();
+
+		// company search
+		if ( empty( $wp_query->query_vars['post_type']) &&
+			 ! empty( $wp_query->tax_query->queries ) &&
+			 isset( $wp_query->query_vars['company'] ) )
+		{
+			$this->client = NULL;
+			$client = $this->client();
+			if ( isset( $wp_query->query_vars['offset'] ) )
+			{
+				if ( isset( $wp_query->query_vars['numberposts'] ) )
+				{
+					$client->SetLimits( $wp_query->query_vars['offset'], $wp_query->query_vars['numberposts'], 1000 );
+				}
+				else
+				{
+					$client->SetLimits( $wp_query->query_vars['offset'], 10, 1000 );
+				}
+			}
+			else
+			{
+				$client->SetLimits( 0, 10, 1000 );
+			}
+
+			$client->SetSortMode( SPH_SORT_EXTENDED, 'post_date_gmt DESC' );
+			$client->SetMatchMode( SPH_MATCH_EXTENDED );
+
+			if ( 'AND' == $wp_query->tax_query->relation )
+			{
+				// set a filter for each ANDed tax query
+				foreach( $wp_query->tax_query->queries as $tax_query )
+				{
+					$ttids = $this->get_tax_query_ids( $tax_query );
+					if ( ! empty( $ttids ) )
+					{
+						if( 'AND' == $tax_query['operator'] )
+						{
+							foreach( $ttids as $ttid )
+							{
+								$client->SetFilter( 'tt_id', array( $ttid ) );
+							}
+						}
+						else
+						{
+							$client->SetFilter( 'tt_id', $ttids, ( 'NOT IN' == $tax_query['operator'] ) );
+						}
+					}
+				}
+			}
+			else
+			{
+				// NOTE: i'm not sure if sphinx's SetFilter() can support
+				// this case exactly?
+				$ttids = array();
+				foreach( $wp_query->tax_query->queries as $tax_query )
+				{
+					//TODO: figure out how to implement this correctly
+					// (as in ORing tax queries with possible inner booleans
+					$ttids[] = $this->get_tax_query_ids( $tax_query );
+				}
+				$client->SetFilter( 'tt_id', $ttids );
+			}
+
+			$this->results = $client->Query( '@post_status publish', 'wp_3_posts' );
+
+			if ( isset( $this->results['matches'] ) )
+			{
+				foreach( $this->results['matches'] as $match )
+				{
+					$ids[] = $match['id'];
+				}
+			}
+		}
+
+		//wlog( print_r( $ids, TRUE ) );
+		return $ids;
+	}
+
+	// convert slugs or ids in the 'terms' field of $tax_query into an
+	// array of taxonomy_term_ids
+	public function get_tax_query_ids( $tax_query )
+	{
+		$ttids = array();
+		foreach( $tax_query['terms'] as $term )
+		{
+			$term = get_term_by( $tax_query['field'], $term, $tax_query['taxonomy'] );
+			if ( $term )
+			{
+				$ttids[] = $term->term_taxonomy_id;
+			}
+		}
+
+		return $ttids;
 	}
 
 }//END GO_Sphinx
