@@ -6,7 +6,8 @@ class GO_Sphinx
 	public $client = FALSE;
 	public $test   = FALSE;
 	public $index_name = FALSE;
-
+	public $filter_args = array();
+	public $use_sphinx = TRUE;
 	public $admin_cap = 'manage_options';
 
 	public function __construct()
@@ -81,62 +82,89 @@ class GO_Sphinx
 
 	public function add_filters()
 	{
-		// first add filters to monitor any changes to the query
-		add_filter( 'posts_search', array( $this, 'check_query' ), 1, 2 );
-		add_filter( 'posts_search', array( $this, 'check_query' ), 9999, 2 );
-/*
-		//add_filter( 'posts_where', array( $this, 'check_query' ), 1, 2 );
-		add_filter( 'posts_where', array( $this, 'check_query' ), 9999, 2 );
-		//add_filter( 'posts_join', array( $this, 'check_query' ), 1, 2 );
-		add_filter( 'posts_join', array( $this, 'check_query' ), 9999, 2 );
-		//add_filter( 'posts_where_paged', array( $this, 'check_query' ), 1, 2 );
-		add_filter( 'posts_where_paged', array( $this, 'check_query' ), 9999, 2 );
-		//add_filter( 'posts_groupby', array( $this, 'check_query' ), 1, 2 );
-		add_filter( 'posts_groupby', array( $this, 'check_query' ), 9999, 2 );
-		//add_filter( 'posts_join_paged', array( $this, 'check_query' ), 1, 2 );
-		add_filter( 'posts_join_paged', array( $this, 'check_query' ), 9999, 2 );
-		//add_filter( 'posts_orderby', array( $this, 'check_query' ), 1, 2 );
-		add_filter( 'posts_orderby', array( $this, 'check_query' ), 9999, 2 );
-		//add_filter( 'posts_distinct', array( $this, 'check_query' ), 1, 2 );
-		add_filter( 'posts_distinct', array( $this, 'check_query' ), 9999, 2 );
-		//add_filter( 'posts_limits', array( $this, 'check_query' ), 1, 2 );
-		add_filter( 'posts_limits', array( $this, 'check_query' ), 9999, 2 );
-		//add_filter( 'posts_fields', array( $this, 'check_query' ), 1, 2 );
-		add_filter( 'posts_fields', array( $this, 'check_query' ), 9999, 2 );
-		//add_filter( 'posts_clauses', array( $this, 'check_query' ), 1, 2 );
-		add_filter( 'posts_clauses', array( $this, 'check_query' ), 9999, 2 );
-		//add_filter( 'posts_where_request', array( $this, 'check_query' ), 1, 2 );
-		add_filter( 'posts_where_request', array( $this, 'check_query' ), 9999, 2 );
-		//add_filter( 'posts_groupby_request', array( $this, 'check_query' ), 1, 2 );
-		add_filter( 'posts_groupby_request', array( $this, 'check_query' ), 9999, 2 );
-		//add_filter( 'posts_join_request', array( $this, 'check_query' ), 1, 2 );
-		add_filter( 'posts_join_request', array( $this, 'check_query' ), 9999, 2 );
-		//add_filter( 'posts_orderby_request', array( $this, 'check_query' ), 1, 2 );
-		add_filter( 'posts_orderby_request', array( $this, 'check_query' ), 9999, 2 );
-		//add_filter( 'posts_distinct_request', array( $this, 'check_query' ), 1, 2 );
-		add_filter( 'posts_distinct_request', array( $this, 'check_query' ), 9999, 2 );
-		//add_filter( 'posts_fields_request', array( $this, 'check_query' ), 1, 2 );
-		add_filter( 'posts_fields_request', array( $this, 'check_query' ), 9999, 2 );
-		//add_filter( 'posts_limits_request', array( $this, 'check_query' ), 1, 2 );
-		add_filter( 'posts_limits_request', array( $this, 'check_query' ), 9999, 2 );
-		//add_filter( 'posts_clauses_request', array( $this, 'check_query' ), 1, 2 );
-		add_filter( 'posts_clauses_request', array( $this, 'check_query' ), 9999, 2 );
-		//add_filter( 'posts_request', array( $this, 'check_query' ), 1, 2 );
-		add_filter( 'posts_request', array( $this, 'check_query' ), 9999, 2 );
-*/
+		$this->add_tester_filters();
 
-		// then add filters to inject sphinx search results if applicable
+		// filters to inject sphinx search results if applicable
 		add_filter( 'split_the_query', array( $this, 'split_the_query' ), 9999, 2 );
 		add_filter( 'posts_request_ids', array( $this, 'posts_request_ids' ), 9999, 2 );
 		add_filter( 'found_posts_query', array( $this, 'found_posts_query' ), 9999 );
 		add_filter( 'found_posts', array( $this, 'found_posts' ), 9999, 2 );
 	}
 
+	// filters to check if another plugin has modified wp query
+	public function add_tester_filters()
+	{
+		add_filter( 'posts_search', array( $this, 'check_query' ), 1, 2 );
+		add_filter( 'posts_search', array( $this, 'check_query' ), 9999, 2 );
+
+		add_filter( 'posts_where', array( $this, 'check_query' ), 1, 2 );
+		add_filter( 'posts_where', array( $this, 'check_query' ), 9999, 2 );
+		add_filter( 'posts_join', array( $this, 'check_query' ), 1, 2 );
+		add_filter( 'posts_join', array( $this, 'check_query' ), 9999, 2 );
+		add_filter( 'posts_where_paged', array( $this, 'check_query' ), 1, 2 );
+		add_filter( 'posts_where_paged', array( $this, 'check_query' ), 9999, 2 );
+		add_filter( 'posts_groupby', array( $this, 'check_query' ), 1, 2 );
+		add_filter( 'posts_groupby', array( $this, 'check_query' ), 9999, 2 );
+		add_filter( 'posts_join_paged', array( $this, 'check_query' ), 1, 2 );
+		add_filter( 'posts_join_paged', array( $this, 'check_query' ), 9999, 2 );
+		add_filter( 'posts_orderby', array( $this, 'check_query' ), 1, 2 );
+		add_filter( 'posts_orderby', array( $this, 'check_query' ), 9999, 2 );
+		add_filter( 'posts_distinct', array( $this, 'check_query' ), 1, 2 );
+		add_filter( 'posts_distinct', array( $this, 'check_query' ), 9999, 2 );
+		add_filter( 'posts_limits', array( $this, 'check_query' ), 1, 2 );
+		add_filter( 'posts_limits', array( $this, 'check_query' ), 9999, 2 );
+		add_filter( 'posts_fields', array( $this, 'check_query' ), 1, 2 );
+		add_filter( 'posts_fields', array( $this, 'check_query' ), 9999, 2 );
+		add_filter( 'posts_clauses', array( $this, 'check_query' ), 1, 2 );
+		add_filter( 'posts_clauses', array( $this, 'check_query' ), 9999, 2 );
+		add_filter( 'posts_where_request', array( $this, 'check_query' ), 1, 2 );
+		add_filter( 'posts_where_request', array( $this, 'check_query' ), 9999, 2 );
+		add_filter( 'posts_groupby_request', array( $this, 'check_query' ), 1, 2 );
+		add_filter( 'posts_groupby_request', array( $this, 'check_query' ), 9999, 2 );
+		add_filter( 'posts_join_request', array( $this, 'check_query' ), 1, 2 );
+		add_filter( 'posts_join_request', array( $this, 'check_query' ), 9999, 2 );
+		add_filter( 'posts_orderby_request', array( $this, 'check_query' ), 1, 2 );
+		add_filter( 'posts_orderby_request', array( $this, 'check_query' ), 9999, 2 );
+		add_filter( 'posts_distinct_request', array( $this, 'check_query' ), 1, 2 );
+		add_filter( 'posts_distinct_request', array( $this, 'check_query' ), 9999, 2 );
+		add_filter( 'posts_fields_request', array( $this, 'check_query' ), 1, 2 );
+		add_filter( 'posts_fields_request', array( $this, 'check_query' ), 9999, 2 );
+		add_filter( 'posts_limits_request', array( $this, 'check_query' ), 1, 2 );
+		add_filter( 'posts_limits_request', array( $this, 'check_query' ), 9999, 2 );
+		add_filter( 'posts_clauses_request', array( $this, 'check_query' ), 1, 2 );
+		add_filter( 'posts_clauses_request', array( $this, 'check_query' ), 9999, 2 );
+		add_filter( 'posts_request', array( $this, 'check_query' ), 1, 2 );
+		add_filter( 'posts_request', array( $this, 'check_query' ), 9999, 2 );
+	}
+
 	// the callback to track whether another plugin has altered the
 	// query being processed
 	public function check_query( $request, $wp_query )
 	{
-		$this->use_sphinx = TRUE;
+		if ( ! $this->use_sphinx )
+		{
+			return; // already decided to not use
+		}
+
+		// a little hacky. is there a better way?
+		$callers = debug_backtrace();
+		$filter_name = $callers[2]['args'][0];
+		if ( ! isset( $this->filter_args[ $filter_name ] ) )
+		{
+			$this->filter_args[ $filter_name ] = $request;
+		}
+		elseif ( $request != $this->filter_args[ $filter_name ] )
+		{
+			// a plugin has altered the query in some way
+			$this->use_sphinx = FALSE;
+		}
+
+		/*
+		if ( ( 'posts_request' == $filter_name ) && isset( $this->filter_args[ $filter_name ] ) )
+		{
+			wlog( ($this->use_sphinx ? 'wp_query unchanged' : 'wp_query changed' ) );
+		}
+		*/
 		return $request;
 	}
 
@@ -146,8 +174,12 @@ class GO_Sphinx
 	// use sphinx for the search results
 	public function split_the_query( $split_the_query, $wp_query )
 	{
-		// if we can process this query then return TRUE for further
-		// processing
+		if ( ! $this->use_sphinx )
+		{
+			return $split_the_query;
+		}
+
+		// check if we know how to process this query
 		if ( $this->can_use_sphinx( $wp_query ) )
 		{
 			return TRUE;
@@ -183,6 +215,7 @@ class GO_Sphinx
 				$request = 'SELECT ID FROM wp_posts WHERE 1 = 0';
 			}
 		}
+
 		return $request;
 	}
 
@@ -192,9 +225,7 @@ class GO_Sphinx
 	// make WP/mysql do any unnecessary additional work.
 	public function found_posts_query( $param )
 	{
-		if ( ( 'nav_menu_bar' != $wp_query->query_vars['post_type'] ) &&
-			 ( 'nav_menu_item' != $wp_query->query_vars['post_type'] ) &&
-			 ( ! empty( $wp_query->query ) ) )
+		if ( $this->use_sphinx )
 		{
 			$param = 'SELECT 0';
 		}
@@ -209,7 +240,17 @@ class GO_Sphinx
 		{
 			$found_posts = $this->results['total_found'];
 		}
+
+		// reset our states for the next query
+		$this->reset();
+
 		return $found_posts;
+	}
+
+	public function reset()
+	{
+		$this->use_sphinx = TRUE;
+		$this->filter_args = array();
 	}
 
 	// check if we can use sphinx for this wp_query
