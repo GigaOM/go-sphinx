@@ -243,16 +243,15 @@ wlog( $wp_query );
 		{
 			$this->client = NULL;
 			$client = $this->client();
-			if ( isset( $wp_query->query_vars['offset'] ) )
+			if ( isset( $wp_query->query_vars['paged'] ) )
 			{
-				if ( isset( $wp_query->query_vars['numberposts'] ) )
+				$posts_per_page = 10;
+				if ( isset( $wp_query->query_vars['posts_per_page'] ) )
 				{
-					$client->SetLimits( $wp_query->query_vars['offset'], $wp_query->query_vars['numberposts'], 1000 );
+					$posts_per_page = $wp_query->query_vars['posts_per_page'];
 				}
-				else
-				{
-					$client->SetLimits( $wp_query->query_vars['offset'], 10, 1000 );
-				}
+				$offset = ($wp_query->query_vars['paged'] - 1 ) * $posts_per_page;
+				$client->SetLimits( $offset, $posts_per_page, 1000 );
 			}
 			else
 			{
