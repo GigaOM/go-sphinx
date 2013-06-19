@@ -1,24 +1,27 @@
 <?php
 
-require_once('wlog.php');
-
 class GO_Sphinx
 {
-
-	public $admin = FALSE;
+	public $admin  = FALSE;
 	public $client = FALSE;
-	public $test = FALSE;
+	public $test   = FALSE;
+	public $index_name = FALSE;
 
 	public $admin_cap = 'manage_options';
 
 	public function __construct()
 	{
-		$this->add_filters();
+		global $wpdb;
+		$this->index_name = $wpdb->posts;
 
 		// the admin settings page
 		if ( is_admin() )
 		{
 			$this->admin();
+		}
+		else
+		{
+			$this->add_filters();
 		}
 	}
 
@@ -60,6 +63,11 @@ class GO_Sphinx
 		return $this->client;
 	}
 
+	public function search_test()
+	{
+		$this->test()->search_test();
+	}
+
 	public function test()
 	{
 		if ( ! $this->test )
@@ -74,8 +82,9 @@ class GO_Sphinx
 	public function add_filters()
 	{
 		// first add filters to monitor any changes to the query
-		//add_filter( 'posts_search', array( $this, 'check_query' ), 1, 2 );
+		add_filter( 'posts_search', array( $this, 'check_query' ), 1, 2 );
 		add_filter( 'posts_search', array( $this, 'check_query' ), 9999, 2 );
+/*
 		//add_filter( 'posts_where', array( $this, 'check_query' ), 1, 2 );
 		add_filter( 'posts_where', array( $this, 'check_query' ), 9999, 2 );
 		//add_filter( 'posts_join', array( $this, 'check_query' ), 1, 2 );
@@ -114,7 +123,7 @@ class GO_Sphinx
 		add_filter( 'posts_clauses_request', array( $this, 'check_query' ), 9999, 2 );
 		//add_filter( 'posts_request', array( $this, 'check_query' ), 1, 2 );
 		add_filter( 'posts_request', array( $this, 'check_query' ), 9999, 2 );
-
+*/
 
 		// then add filters to inject sphinx search results if applicable
 		add_filter( 'split_the_query', array( $this, 'split_the_query' ), 9999, 2 );
@@ -127,8 +136,6 @@ class GO_Sphinx
 	// query being processed
 	public function check_query( $request, $wp_query )
 	{
-		//wlog( 'request: ' . print_r($request, true));
-		//wlog( 'wp_query: ' . print_r($wp_query, true));
 		$this->use_sphinx = TRUE;
 		return $request;
 	}
@@ -154,14 +161,12 @@ class GO_Sphinx
 	// replace the request (SQL) to come up with search result post ids
 	public function posts_request_ids( $request, $wp_query )
 	{
-
-wlog( $wp_query );
-
 		if ( $this->use_sphinx )
 		{
 			// return a SQL query that encodes the sphinx search results like:
 			// SELECT 176060 AS ID UNION ALL SELECT 175439 UNION ALL SELECT ...
 			$results = $this->sphinx_query( $request, $wp_query );
+
 			if ( 0 < count( $results ) )
 			{
 				$request = 'SELECT ' . $results[0] . ' AS ID';
@@ -232,8 +237,6 @@ wlog( $wp_query );
 	// perform a sphinx query that's equivalent to the $wp_query
 	public function sphinx_query( $request, $wp_query )
 	{
-		//wlog( $wp_query );
-
 		$ids = array();
 
 		// company search
@@ -243,7 +246,7 @@ wlog( $wp_query );
 		{
 			$this->client = NULL;
 			$client = $this->client();
-			if ( isset( $wp_query->query_vars['paged'] ) )
+			if ( isset( $wp_query->query_vars['paged'] ) && ( 0 < $wp_query->query_vars['paged'] ) )
 			{
 				$posts_per_page = 10;
 				if ( isset( $wp_query->query_vars['posts_per_page'] ) )
@@ -297,7 +300,7 @@ wlog( $wp_query );
 				$client->SetFilter( 'tt_id', $ttids );
 			}
 
-			$this->results = $client->Query( '@post_status publish', 'wp_3_posts' );
+			$this->results = $client->Query( '@post_status publish', $this->index_name );
 
 			if ( isset( $this->results['matches'] ) )
 			{
@@ -308,7 +311,6 @@ wlog( $wp_query );
 			}
 		}
 
-		//wlog( print_r( $ids, TRUE ) );
 		return $ids;
 	}
 
