@@ -38,8 +38,8 @@ source <?php echo $c->name; ?>
 	sql_attr_timestamp  = post_date_gmt
 	sql_attr_timestamp  = post_modified_gmt
 	sql_attr_uint       = post_author
-	sql_attr_string     = post_status
-	sql_attr_string     = post_type
+	sql_field_string    = post_status
+	sql_field_string    = post_type
 	sql_attr_uint       = comment_count
 	sql_attr_uint       = post_parent
 	sql_attr_multi      = uint tt_id from field; \
