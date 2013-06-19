@@ -12,7 +12,8 @@ class GO_Sphinx_Test extends GO_Sphinx
 
 	public function __construct()
 	{
-		add_action( 'wp_ajax_go_sphinx_search_test', array( $this, 'search_test' ));
+		parent::__construct();
+		add_action( 'wp_ajax_go_sphinx_search_test', array( $this, 'search_test' ), 11 );
 	}
 
 	public function search_test()
@@ -198,7 +199,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 
 		if ( 0 < $num_failed )
 		{
-			echo '<h2><font color="red">' . $num_failed . ' out of ' . $this->test_count . " tests failed</font></h2>\n\n";
+			echo '<h2>' . ( $this->test_count - $num_failed ) . ' out of ' . $this->test_count . " tests passed</font></h2>\n\n";
 		}
 		else
 		{
@@ -420,7 +421,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 			}
 		}
 		$client->SetMatchMode( SPH_MATCH_EXTENDED );
-		$results = $client->Query( '@post_status publish' );
+		$results = $client->Query( '@post_status publish', $this->index_name );
 
 		if ( FALSE !== $results )
 		{
@@ -626,7 +627,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 		$client->SetLimits( $offset, $num_results, 1000 );
 		$client->SetSortMode( SPH_SORT_EXTENDED, 'post_date_gmt DESC' );
 		$client->SetMatchMode( SPH_MATCH_EXTENDED );
-		$results = $client->Query( '@post_status publish' );
+		$results = $client->Query( '@post_status publish', $this->index_name );
 
 		if ( FALSE === $results )
 		{
@@ -837,7 +838,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 		$client->SetLimits( 0, 10, 1000 );
 		$client->SetSortMode( SPH_SORT_EXTENDED, 'post_date_gmt DESC' );
 		$client->SetMatchMode( SPH_MATCH_EXTENDED );
-		$results = $client->Query( '@post_status publish' );
+		$results = $client->Query( '@post_status publish', $this->index_name );
 
 		if ( FALSE === $results )
 		{
@@ -926,7 +927,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 		//$client->SetSortMode( SPH_SORT_EXTENDED, '@rank DESC, post_date_gmt DESC' );
 		$client->SetSortMode( SPH_SORT_EXTENDED, 'post_date_gmt DESC, @rank DESC' );
 		$client->SetMatchMode( SPH_MATCH_EXTENDED );
-		$spx_results = $client->Query( '@post_content "' . $term->name . '" @post_status publish' );
+		$spx_results = $client->Query( '@post_content "' . $term->name . '" @post_status publish', $this->index_name );
 
 		if ( FALSE === $spx_results )
 		{
@@ -1054,7 +1055,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 		$client->SetMatchMode( SPH_MATCH_EXTENDED );
 		$client->SetFilter( 'post_author', $author_ids, $exclude );
 
-		$results = $client->Query( '@post_status publish'); // @post_author ' . $author_id 
+		$results = $client->Query( '@post_status publish', $this->index_name );
 		
 		if ( FALSE !== $results )
 		{
@@ -1139,7 +1140,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 		$client->SetSortMode( SPH_SORT_EXTENDED, 'post_date_gmt DESC, @rank DESC' );
 		$client->SetMatchMode( SPH_MATCH_EXTENDED );
 		$client->SetFilter( '@id', $excluded_posts, TRUE );
-		$spx_results = $client->Query( '@post_status publish' );
+		$spx_results = $client->Query( '@post_status publish', $this->index_name );
 
 		if ( FALSE === $spx_results )
 		{
@@ -1233,7 +1234,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 		$client->SetSortMode( SPH_SORT_EXTENDED, 'post_date_gmt DESC, @rank DESC' );
 		$client->SetMatchMode( SPH_MATCH_EXTENDED );
 		$client->SetFilter( '@id', array( $id_to_test ) );
-		$spx_results = $client->Query( '@post_status publish' );
+		$spx_results = $client->Query( '@post_status publish', $this->index_name );
 
 		if ( FALSE === $spx_results )
 		{
@@ -1331,7 +1332,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 		$client->SetLimits( 0, 10, 1000 );
 		$client->SetSortMode( SPH_SORT_EXTENDED, 'post_date_gmt DESC' );
 		$client->SetMatchMode( SPH_MATCH_EXTENDED );
-		$results = $client->Query( '@post_status publish' );
+		$results = $client->Query( '@post_status publish', $this->index_name );
 
 		if ( FALSE === $results )
 		{
@@ -1578,7 +1579,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 		$client->SetSortMode( SPH_SORT_EXTENDED, 'post_date_gmt DESC' );
 		$client->SetMatchMode( SPH_MATCH_EXTENDED );
 		$client->SetFilter( 'tt_id', array( $the_term->term_taxonomy_id ), ! $include );
-		$sp_results = $client->Query( '@post_status publish' );
+		$sp_results = $client->Query( '@post_status publish', $this->index_name );
 
 		$sp_result_ids = $this->extract_sphinx_matches_ids( $sp_results );
 
@@ -1672,7 +1673,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 		{
 			$client->SetFilter( 'tt_id', array( $ttid ) );
 		}
-		$sp_results = $client->Query( '@post_status publish' );
+		$sp_results = $client->Query( '@post_status publish', $this->index_name );
 
 		$sp_result_ids = $this->extract_sphinx_matches_ids( $sp_results );
 
@@ -1773,7 +1774,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 		$client->SetFilter( 'tt_id', array( $the_terms[1]->term_taxonomy_id ) );
 
 		$client->SetMatchMode( SPH_MATCH_EXTENDED );
-		$sp_results = $client->Query( '@post_status publish' );
+		$sp_results = $client->Query( '@post_status publish', $this->index_name );
 
 		$sp_result_ids = $this->extract_sphinx_matches_ids( $sp_results );
 
@@ -1979,7 +1980,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 		$client->SetSortMode( SPH_SORT_EXTENDED, '@id DESC' );
 		$client->SetFilter( 'post_parent', array( $the_post->post_parent ) );
 		$client->SetMatchMode( SPH_MATCH_EXTENDED );
-		$sp_results = $client->Query( '@post_status publish' );
+		$sp_results = $client->Query( '@post_status publish', $this->index_name );
 
 		if ( ! isset( $sp_results['matches'] ) ||
 			 ( 0 == count( $sp_results['matches'] ) ) )
