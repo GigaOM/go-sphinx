@@ -1,5 +1,7 @@
 <?php
 
+//require_once('wlog.php');
+
 class GO_Sphinx
 {
 	public $admin  = FALSE;
@@ -7,8 +9,57 @@ class GO_Sphinx
 	public $test   = FALSE;
 	public $index_name = FALSE;
 	public $filter_args = array();
-	public $use_sphinx = TRUE;
+	public $query_modified = FALSE; // did another plugin modify the current query?
+	public $use_sphinx = TRUE; // can we use sphinx for the current query?
 	public $admin_cap = 'manage_options';
+	public $filters_to_watch = array(
+		'posts_search',
+		'posts_where',
+		'posts_join',
+		'posts_where_paged',
+		'posts_groupby',
+		'posts_join_paged',
+		'posts_orderby',
+		'posts_distinct',
+		'posts_limits',
+		'posts_fields',
+		'posts_clauses',
+		'posts_where_request',
+		'posts_groupby_request',
+		'posts_join_request',
+		'posts_orderby_request',
+		'posts_distinct_request',
+		'posts_fields_request',
+		'posts_limits_request',
+		'posts_clauses_request',
+		'posts_request',
+		);
+	public $supported_query_vars = array(
+		'author',
+		'category__in',
+		'category__not_in',
+		'category__and',
+		/* 'fields', */
+		/* ignore_sticky_posts, */
+		'offset',
+		'order',
+		'orderby',
+		'paged',
+		'post__in',
+		'post__not_in',
+		'post_parent',
+		'post_status',
+		'post_type',
+		'posts_per_page',
+		's',
+		'tag_id',
+		'tag__in',
+		'tag__not_in',
+		'tag__and',
+		'tag_slug__in',
+		'tag_slug__and',
+		'tax_query',
+		);
 
 	public function __construct()
 	{
@@ -100,6 +151,7 @@ class GO_Sphinx
 	{
 		//TODO: add all filters here if we're going to remove them all
 		// after the query's over
+		$this->query_modified = FALSE;
 		$this->use_sphinx = TRUE;
 		$this->filter_args = array();
 
@@ -109,31 +161,8 @@ class GO_Sphinx
 	// filters to check if another plugin has modified wp query
 	public function add_tester_filters()
 	{
-		$filters_to_hook = array(
-			'posts_search',
-			'posts_where',
-			'posts_join',
-			'posts_where_paged',
-			'posts_groupby',
-			'posts_join_paged',
-			'posts_orderby',
-			'posts_distinct',
-			'posts_limits',
-			'posts_fields',
-			'posts_clauses',
-			'posts_where_request',
-			'posts_groupby_request',
-			'posts_join_request',
-			'posts_orderby_request',
-			'posts_distinct_request',
-			'posts_fields_request',
-			'posts_limits_request',
-			'posts_clauses_request',
-			'posts_request',
-		);
-
 		// hook our callback before and after all other callbacks
-		foreach( $filters_to_hook as $filter )
+		foreach( $this->filters_to_watch as $filter )
 		{
 			add_filter( $filter, array( $this, 'check_query' ), 1 );
 			add_filter( $filter, array( $this, 'check_query' ), 9999 );
@@ -144,7 +173,7 @@ class GO_Sphinx
 	// query being processed
 	public function check_query( $request )
 	{
-		if ( ! $this->use_sphinx )
+		if ( $this->query_modified )
 		{
 			return; // already decided to not use
 		}
@@ -158,7 +187,7 @@ class GO_Sphinx
 		elseif ( $request != $this->filter_args[ $current_filter ] )
 		{
 			// a plugin has altered the query in some way
-			$this->use_sphinx = FALSE;
+			$this->query_modified = TRUE;
 		}
 
 		return $request;
@@ -170,18 +199,22 @@ class GO_Sphinx
 	// use sphinx for the search results
 	public function split_the_query( $split_the_query, $wp_query )
 	{
-		if ( ! $this->use_sphinx )
+		// cannot use sphinx if the query has been modified by another
+		// plugin
+
+		if ( $this->query_modified )
 		{
+			$this->use_sphinx = FALSE;
 			return $split_the_query;
 		}
 
-		// check if we know how to process this query
-		if ( $this->wp_to_sphinx( $wp_query ) )
+		// check if we can use sphinx for this query or not
+		$this->use_sphinx = $this->is_supported_query( $wp_query );
+
+		if ( $this->use_sphinx )
 		{
 			return TRUE;
 		}
-
-		$this->use_sphinx = FALSE;
 
 		return $split_the_query;
 	}
@@ -189,24 +222,28 @@ class GO_Sphinx
 	// replace the request (SQL) to come up with search result post ids
 	public function posts_request_ids( $request, $wp_query )
 	{
-		if ( $this->use_sphinx )
+		if ( ! $this->use_sphinx )
 		{
-			global $wpdb;
+			return $request;
+		}
 
-			// return a SQL query that encodes the sphinx search results like
-			// SELECT ID from wp_posts
-			// WHERE ID IN ( 5324, 1231) ORDER BY FIELD( ID, 5324, 1231)
-			$results = $this->sphinx_query( $request, $wp_query );
+		//wlog( $wp_query );
 
-			if ( 0 < count( $results ) )
-			{
-				$request = "SELECT ID FROM $wpdb->posts WHERE ID IN (" . implode( ',', $results ) . ') ORDER BY FIELD ( ID, ' . implode( ',', $results ) . ')';
-			}
-			else
-			{
-				// return a sql that returns nothing
-				$request = "SELECT ID FROM $wpdb->posts WHERE 1 = 0";
-			}
+		global $wpdb;
+
+		// return a SQL query that encodes the sphinx search results like
+		// SELECT ID from wp_posts
+		// WHERE ID IN ( 5324, 1231) ORDER BY FIELD( ID, 5324, 1231)
+		$result_ids = $this->sphinx_query( $wp_query );
+
+		if ( 0 < count( $result_ids ) )
+		{
+			$request = "SELECT ID FROM $wpdb->posts WHERE ID IN (" . implode( ',', $result_ids ) . ') ORDER BY FIELD ( ID, ' . implode( ',', $result_ids ) . ')';
+		}
+		else
+		{
+			// return a sql that returns nothing
+			$request = "SELECT ID FROM $wpdb->posts WHERE 1 = 0";
 		}
 
 		return $request;
@@ -218,11 +255,12 @@ class GO_Sphinx
 	// make WP/mysql do any unnecessary additional work.
 	public function found_posts_query( $param )
 	{
-		if ( $this->use_sphinx )
+		if ( ! $this->use_sphinx )
 		{
-			$param = 'SELECT 0';
+			return $param;
 		}
-		return $param;
+
+		return 'SELECT 0';
 	}
 
 	// overrides the number of posts found. in search this affects
@@ -237,103 +275,89 @@ class GO_Sphinx
 		return $found_posts;
 	}
 
-	// check if we can convert the wp_query to a sphinx query
-	public function wp_to_sphinx( $wp_query )
+	// parse $wp_query to determine if we can use sphinx for this
+	// search or not.
+	public function is_supported_query( $wp_query )
 	{
+		// check manual override first
 		if ( isset( $_GET['no_sphinx'] ) )
 		{
 			return FALSE;
 		}
 
-		// TODO: implement the actual checks. for now this is just accepts
-		// simple company searches to test how to inject sphinx results
-		// into WP_Query results
-		if ( ! empty( $wp_query->query ) &&
-			 empty( $wp_query->query_vars['post_type']) &&
-			 ! empty( $wp_query->tax_query->queries ) &&
-			 isset( $wp_query->query_vars['company'] ) )
+		if ( 'nav_menu_item' == $wp_query->query['post_type'] )
 		{
-			return TRUE;
+			return FALSE;
 		}
 
-		return FALSE;
+		//TODO: detect and block queries we cannot support here
+		return TRUE;
 	}
 
 	// perform a sphinx query that's equivalent to the $wp_query
-	public function sphinx_query( $request, $wp_query )
+	public function sphinx_query( $wp_query )
 	{
-		$ids = array();
+		$ids = array(); // our results
 
-		// company search
-		if ( empty( $wp_query->query_vars['post_type']) &&
-			 ! empty( $wp_query->tax_query->queries ) &&
-			 isset( $wp_query->query_vars['company']
-			) )
+		// we only know about tax queries for now
+		if ( empty( $wp_query->tax_query->queries ) )
 		{
-			$this->client = NULL;
-			$client = $this->client();
-			if ( isset( $wp_query->query_vars['paged'] ) && ( 0 < $wp_query->query_vars['paged'] ) )
-			{
-				$posts_per_page = 10;
-				if ( isset( $wp_query->query_vars['posts_per_page'] ) )
-				{
-					$posts_per_page = $wp_query->query_vars['posts_per_page'];
-				}
-				$offset = ($wp_query->query_vars['paged'] - 1 ) * $posts_per_page;
-				$client->SetLimits( $offset, $posts_per_page, 1000 );
-			}
-			else
-			{
-				$client->SetLimits( 0, 10, 1000 );
-			}
+			return $ids;
+		}
 
-			$client->SetSortMode( SPH_SORT_EXTENDED, 'post_date_gmt DESC' );
-			$client->SetMatchMode( SPH_MATCH_EXTENDED );
-
-			if ( 'AND' == $wp_query->tax_query->relation )
+		$this->client = NULL;
+		$client = $this->client();
+		if ( 'AND' == $wp_query->tax_query->relation )
+		{
+			foreach( $wp_query->tax_query->queries as $query )
 			{
-				// set a filter for each ANDed tax query
-				foreach( $wp_query->tax_query->queries as $tax_query )
+				// use WP_Tax_Query::transform_query() to look up the term tax ids
+				$wp_query->tax_query->transform_query( $query, 'term_taxonomy_id' );
+				if ( 'AND' == $query['operator'] )
 				{
-					$ttids = $this->get_tax_query_ids( $tax_query );
-					if ( ! empty( $ttids ) )
+					// one filter per ttid
+					foreach( $query['terms'] as $ttid )
 					{
-						if( 'AND' == $tax_query['operator'] )
-						{
-							foreach( $ttids as $ttid )
-							{
-								$client->SetFilter( 'tt_id', array( $ttid ) );
-							}
-						}
-						else
-						{
-							$client->SetFilter( 'tt_id', $ttids, ( 'NOT IN' == $tax_query['operator'] ) );
-						}
+						$client->SetFilter( 'tt_id', array( $ttid ) );
 					}
 				}
-			}
-			else
-			{
-				// NOTE: i'm not sure if sphinx's SetFilter() can support
-				// this case exactly?
-				$ttids = array();
-				foreach( $wp_query->tax_query->queries as $tax_query )
+				else
 				{
-					//TODO: figure out how to implement this correctly
-					// (as in ORing tax queries with possible inner booleans
-					$ttids[] = $this->get_tax_query_ids( $tax_query );
+					// operator = "IN" or "NOT IN"
+					$client->SetFilter( 'tt_id', $query['terms'], ( 'NOT IN' == $query['operator'] ) );
 				}
-				$client->SetFilter( 'tt_id', $ttids );
 			}
+		}
+		else // OR
+		{
+			//TODO: support the outer OR + inner "IN"/inner "NOT IN" cases.
+			// we do not support the outer OR + inner AND case
+			return $ids;
+		}
 
-			$this->results = $client->Query( '@post_status publish', $this->index_name );
-
-			if ( isset( $this->results['matches'] ) )
+		// pagination defaults
+		$offset = 0;
+		$posts_per_page = 10;
+		if ( isset( $wp_query->is_paged ) && ( 0 < $wp_query->query['paged'] ) )
+		{
+			if ( isset( $wp_query->query_vars['posts_per_page'] ) )
 			{
-				foreach( $this->results['matches'] as $match )
-				{
-					$ids[] = $match['id'];
-				}
+				$posts_per_page = $wp_query->query_vars['posts_per_page'];
+			}
+			$offset = ($wp_query->query['paged'] - 1 ) * $posts_per_page;
+		}
+		$client->SetLimits( $offset, $posts_per_page, 1000 );
+
+		$client->SetSortMode( SPH_SORT_EXTENDED, 'post_date_gmt DESC' );
+		$client->SetMatchMode( SPH_MATCH_EXTENDED );
+
+		$this->results = $client->Query( '@post_status publish', $this->index_name );
+
+		if ( isset( $this->results['matches'] ) )
+		{
+			foreach( $this->results['matches'] as $match )
+			{
+				$ids[] = $match['id'];
 			}
 		}
 
