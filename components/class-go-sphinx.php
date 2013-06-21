@@ -5,6 +5,7 @@ class GO_Sphinx
 	public $admin  = FALSE;
 	public $client = FALSE;
 	public $test   = FALSE;
+	public $version = 1;
 	public $index_name = FALSE;
 	public $filter_args = array();
 	public $query_modified = FALSE; // did another plugin modify the current query?
@@ -61,6 +62,8 @@ class GO_Sphinx
 
 	public function __construct()
 	{
+		add_action( 'init' , array( $this, 'init' ) , 10 );
+
 		global $wpdb;
 		$this->index_name = $wpdb->posts;
 
@@ -72,6 +75,16 @@ class GO_Sphinx
 		else
 		{
 			$this->add_filters();
+		}
+	}
+
+	public function init()
+	{
+		if ( isset( $_GET['show_source'] ) )
+		{
+			$plugin_url = untrailingslashit( plugin_dir_url( __FILE__ ) );
+			wp_register_script( 'go-sphinx-js', $plugin_url . '/js/go-sphinx.js', array( 'jquery' ), $this->version, TRUE );
+			wp_enqueue_script( 'go-sphinx-js');
 		}
 	}
 
@@ -235,6 +248,11 @@ class GO_Sphinx
 		{
 			$this->use_sphinx = FALSE;
 			return $request;
+		}
+
+		if ( isset( $_GET['show_source'] ) )
+		{
+			wp_localize_script( 'go-sphinx-js', 'sphinx_results', (array) $this->results );
 		}
 
 		if ( 0 < count( $result_ids ) )
