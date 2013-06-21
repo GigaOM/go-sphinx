@@ -286,7 +286,7 @@ class GO_Sphinx
 			return FALSE;
 		}
 
-		if ( 'nav_menu_item' == $wp_query->query['post_type'] )
+		if ( isset( $wp_query->query['post_type'] ) && ( 'nav_menu_item' == $wp_query->query['post_type'] ) )
 		{
 			return FALSE;
 		}
@@ -304,7 +304,7 @@ class GO_Sphinx
 		// we only know about tax queries for now
 		if ( empty( $wp_query->tax_query->queries ) )
 		{
-			return WP_Error( 'unsupported sphinx query', 'unsupported sphinx query' );
+			return new WP_Error( 'unsupported sphinx query', 'unsupported sphinx query' );
 		}
 
 		$this->client = NULL;
@@ -334,7 +334,7 @@ class GO_Sphinx
 		{
 			//TODO: support the outer OR + inner "IN"/inner "NOT IN" cases.
 			// we do not support the outer OR + inner AND case
-			return WP_Error( 'unsupported sphinx query', 'unsupported sphinx query' );
+			return new WP_Error( 'unsupported sphinx query', 'unsupported sphinx query' );
 		}
 
 		// pagination defaults
@@ -356,7 +356,7 @@ class GO_Sphinx
 		$this->results = $client->Query( '@post_status publish', $this->index_name );
 		if ( FALSE == $this->results )
 		{
-			return WP_Error( 'sphinx query error', $client->GetLastError() );
+			return new WP_Error( 'sphinx query error', $client->GetLastError() );
 		}
 
 		if ( isset( $this->results['matches'] ) )
