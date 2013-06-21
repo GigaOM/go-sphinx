@@ -350,9 +350,19 @@ class GO_Sphinx
 		}
 		else // OR
 		{
-			//TODO: support the outer OR + inner "IN"/inner "NOT IN" cases.
-			// we do not support the outer OR + inner AND case
-			return new WP_Error( 'unsupported sphinx query', 'unsupported sphinx query' );
+			// we do not support the outer OR + inner AND case nor the
+			// outer OR + inner "NOT IN" case
+			$ttids = array();
+			foreach( $wp_query->tax_query->queries as $query )
+			{
+				if ( 'IN' != $query['operator'] )
+				{
+					return new WP_Error( 'unsupported sphinx query', 'unsupported sphinx query (OR relation with AND or "NOT IN" operator(s))' );
+				}
+				$wp_query->tax_query->transform_query( $query, 'term_taxonomy_id' );
+				$ttids[] = array_merge( $ttids, $query['terms'] );
+			}
+			$client->SetFilter( 'tt_id', $ttids );
 		}
 
 		// pagination defaults
