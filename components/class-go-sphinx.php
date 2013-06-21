@@ -1,7 +1,5 @@
 <?php
 
-//require_once('wlog.php');
-
 class GO_Sphinx
 {
 	public $admin  = FALSE;
@@ -227,14 +225,17 @@ class GO_Sphinx
 			return $request;
 		}
 
-		//wlog( $wp_query );
-
 		global $wpdb;
 
 		// return a SQL query that encodes the sphinx search results like
 		// SELECT ID from wp_posts
 		// WHERE ID IN ( 5324, 1231) ORDER BY FIELD( ID, 5324, 1231)
 		$result_ids = $this->sphinx_query( $wp_query );
+		if ( is_wp_error( $result_ids ) )
+		{
+			$this->use_sphinx = FALSE;
+			return $request;
+		}
 
 		if ( 0 < count( $result_ids ) )
 		{
@@ -295,6 +296,7 @@ class GO_Sphinx
 	}
 
 	// perform a sphinx query that's equivalent to the $wp_query
+	// returns WP_Error if we cannot use sphinx for this query.
 	public function sphinx_query( $wp_query )
 	{
 		$ids = array(); // our results
@@ -302,7 +304,7 @@ class GO_Sphinx
 		// we only know about tax queries for now
 		if ( empty( $wp_query->tax_query->queries ) )
 		{
-			return $ids;
+			return WP_Error( 'unsupported sphinx query', 'unsupported sphinx query' );
 		}
 
 		$this->client = NULL;
@@ -332,7 +334,7 @@ class GO_Sphinx
 		{
 			//TODO: support the outer OR + inner "IN"/inner "NOT IN" cases.
 			// we do not support the outer OR + inner AND case
-			return $ids;
+			return WP_Error( 'unsupported sphinx query', 'unsupported sphinx query' );
 		}
 
 		// pagination defaults
@@ -352,6 +354,10 @@ class GO_Sphinx
 		$client->SetMatchMode( SPH_MATCH_EXTENDED );
 
 		$this->results = $client->Query( '@post_status publish', $this->index_name );
+		if ( FALSE == $this->results )
+		{
+			return WP_Error( 'sphinx query error', $client->GetLastError() );
+		}
 
 		if ( isset( $this->results['matches'] ) )
 		{
@@ -394,6 +400,6 @@ function go_sphinx()
 	{
 		$go_sphinx = new GO_Sphinx();
 	}//end if
-
+	
 	return $go_sphinx;
 }//end go_sphinx
