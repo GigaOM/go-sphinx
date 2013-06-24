@@ -10,6 +10,8 @@ class GO_Sphinx
 	public $filter_args = array();
 	public $query_modified = FALSE; // did another plugin modify the current query?
 	public $use_sphinx = TRUE; // can we use sphinx for the current query?
+	public $sphinx_elapsed_time = -1;
+	public $wp_query_request = FALSE;
 	public $admin_cap = 'manage_options';
 	public $filters_to_watch = array(
 		'posts_search',
@@ -165,6 +167,8 @@ class GO_Sphinx
 		$this->query_modified = FALSE;
 		$this->use_sphinx = TRUE;
 		$this->filter_args = array();
+		$this->sphinx_elapsed_time = -1;
+		$this->wp_query_request = FALSE;
 
 		return $query;
 	}
@@ -243,7 +247,10 @@ class GO_Sphinx
 		// return a SQL query that encodes the sphinx search results like
 		// SELECT ID from wp_posts
 		// WHERE ID IN ( 5324, 1231) ORDER BY FIELD( ID, 5324, 1231)
+		$t0 = microtime( TRUE );
 		$result_ids = $this->sphinx_query( $wp_query );
+		$this->sphinx_elapsed_time = microtime( TRUE ) - $t0;
+
 		if ( is_wp_error( $result_ids ) )
 		{
 			$this->use_sphinx = FALSE;
@@ -254,6 +261,9 @@ class GO_Sphinx
 		{
 			wp_localize_script( 'go-sphinx-js', 'sphinx_results', (array) $this->results );
 		}
+
+		// save the original request before overriding it.
+		$this->wp_query_request = $request;
 
 		if ( 0 < count( $result_ids ) )
 		{
