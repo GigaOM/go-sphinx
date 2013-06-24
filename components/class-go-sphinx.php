@@ -365,10 +365,14 @@ class GO_Sphinx
 		$this->sphinx_query_pagination( $client, $wp_query );
 
 		// post_type
-		$query_str = $this->sphinx_query_post_type( $client, $wp_query );
+		$query_strs = array();
+		$query_strs[] = $this->sphinx_query_post_type( $wp_query );
+
+		// post_status
+		$query_strs[] = $this->sphinx_query_post_status( $wp_query );
 
 		$client->SetMatchMode( SPH_MATCH_EXTENDED );
-		$this->results = $client->Query( $query_str, $this->index_name );
+		$this->results = $client->Query( implode( ' ', $query_strs ), $this->index_name );
 		if ( FALSE == $this->results )
 		{
 			return new WP_Error( 'sphinx query error', $client->GetLastError() );
@@ -498,7 +502,7 @@ class GO_Sphinx
 		$offset = 0;
 		$posts_per_page = 10;
 
-		if ( isset( $wp_query->is_paged ) && ( 0 < $wp_query->query['paged'] ) )
+		if ( isset( $wp_query->query['paged'] ) && ( 0 < $wp_query->query['paged'] ) )
 		{
 			if ( isset( $wp_query->query_vars['posts_per_page'] ) )
 			{
@@ -511,29 +515,57 @@ class GO_Sphinx
 	}//END sphinx_query_pagination
 
 	/**
-	 * parse the post_type params in $wp_query and set the appropriate
-	 * flags in the sphinx client $client.
+	 * parse the post_type param in $wp_query and convert it to an equivalent
+	 * sphinx query string.
 	 *
 	 * @retval the equivalent sphinx query string
 	 */
 	public function sphinx_query_post_type( $wp_query )
 	{
-		$query_str = '@post_status publish';
+		$query_str = '';
 		if ( isset( $wp_query->query['post_type'] ) )
 		{
 			if ( is_array( $wp_query->query['post_type'] ) )
 			{
-				foreach( $wp_query->query['post_type'] as $post_type )
-				{
-					$query_str .= ' ' . '@post_type ' . implode( ' ', $wp_query->query['post_type'] );
-				}
+				$query_str = '@post_type ' . implode( ' | ', $wp_query->query['post_type'] );
 			}
 			else
 			{
-				$query_str .= ' ' . '@post_type ' . $wp_query->query['post_type'];
+				$query_str = '@post_type ' . $wp_query->query['post_type'];
 			}
 		}
+		else
+		{
+			$query_str = '@post_type post'; // the WP default
+		}
 
+		return $query_str;
+	}//END sphinx_query_post_type
+
+	/**
+	 * parse the post_status param in $wp_query and convert it to an equivalent
+	 * sphinx query string.
+	 *
+	 * @retval the equivalent sphinx query string
+	 */
+	public function sphinx_query_post_status( $wp_query )
+	{
+		$query_str = '';
+		if ( isset( $wp_query->query['post_status'] ) )
+		{
+			if ( is_array( $wp_query->query['post_status'] ) )
+			{
+				$query_str = '@post_status ' . implode( ' | ', $wp_query->query['post_status'] );
+			}
+			else
+			{
+				$query_str = '@post_status ' . $wp_query->query['post_status'];
+			}
+		}
+		else
+		{
+			$query_str = '@post_status publish'; // the WP default
+		}
 		return $query_str;
 	}//END sphinx_query_post_type
 
