@@ -1870,7 +1870,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 				'match' => TRUE,
 				),
 			array(
-				'wp'    => array( 'comment_count ID', 'ASC' ),
+				'wp'    => array( 'comment_count', 'ASC' ),
 				'sp'    => array( 'comment_count', 'ASC' ),
 				'match' => TRUE,
 				),
