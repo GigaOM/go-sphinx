@@ -314,7 +314,17 @@ class GO_Sphinx
 			return FALSE;
 		}
 
-		if ( isset( $wp_query->query['post_type'] ) && ( 'nav_menu_item' == $wp_query->query['post_type'] ) )
+		if (
+			isset( $wp_query->query['orderby'] ) &&
+			( 'none' != $wp_query->query['orderby'] ) &&
+			( 'ID' != $wp_query->query['orderby'] ) &&
+			( 'title' != $wp_query->query['orderby'] ) &&
+			( 'date' != $wp_query->query['orderby'] ) &&
+			( 'modified' != $wp_query->query['orderby'] ) &&
+			( 'parent' != $wp_query->query['orderby'] ) &&
+			( 'rand' != $wp_query->query['orderby'] ) &&
+			( 'comment_count' != $wp_query->query['orderby'] )
+			)
 		{
 			return FALSE;
 		}
@@ -330,13 +340,112 @@ class GO_Sphinx
 		$ids = array(); // our results
 
 		// we only know about tax queries for now
+/*
 		if ( empty( $wp_query->tax_query->queries ) )
 		{
 			return new WP_Error( 'unsupported sphinx query', 'unsupported sphinx query' );
 		}
-
+*/
 		$this->client = NULL;
 		$client = $this->client();
+
+		// order and orderby
+		if ( is_wp_error( $res = $this->sphinx_query_ordering( $client, $wp_query ) ) )
+		{
+			return $res;
+		}
+
+		// tax_query
+		if ( is_wp_error( $res = $this->sphinx_query_taxonomy( $client, $wp_query ) ) )
+		{
+			return $res;
+		}
+
+		// pagination
+		$this->sphinx_query_pagination( $client, $wp_query );
+
+		// post_type
+		$query_str = $this->sphinx_query_post_type( $client, $wp_query );
+
+		$client->SetMatchMode( SPH_MATCH_EXTENDED );
+		$this->results = $client->Query( $query_str, $this->index_name );
+		if ( FALSE == $this->results )
+		{
+			return new WP_Error( 'sphinx query error', $client->GetLastError() );
+		}
+
+		if ( isset( $this->results['matches'] ) )
+		{
+			foreach( $this->results['matches'] as $match )
+			{
+				$ids[] = $match['id'];
+			}
+		}
+
+		return $ids;
+	}
+
+	/**
+	 * parse order and orderby params in $wp_query and set the appropriate
+	 * flags in the sphinx client $client.
+	 *
+	 * @retval TRUE if we're able to parse the wp_query.
+	 * @retval WP_Error if we encounter an error or if the wp_query is not
+	 *  supported.
+	 */
+	public function sphinx_query_ordering( &$client, $wp_query )
+	{
+		$order = isset( $wp_query->query['order'] ) ? $wp_query->query['order'] : 'DESC';
+
+		if ( isset( $wp_query->query['orderby'] ) )
+		{
+			switch ( $wp_query->query['orderby'] )
+			{
+				case 'none':
+					break;
+
+				case 'ID':
+					$client->SetSortMode( SPH_SORT_EXTENDED, '@id ' . $order );
+					break;
+
+				case 'date':
+					$client->SetSortMode( SPH_SORT_EXTENDED, 'post_date_gmt ' . $order );
+					break;
+
+				case 'modified':
+					$client->SetSortMode( SPH_SORT_EXTENDED, 'post_modified_gmt ' . $order );
+					break;
+
+				case 'parent':
+					$client->SetSortMode( SPH_SORT_EXTENDED, 'post_parent ' . $order );
+					break;
+
+				case 'rand':
+					$client->SetSortMode( SPH_SORT_EXTENDED, '@random ' . $order );
+					break;
+
+				case 'comment_count':
+					$client->SetSortMode( SPH_SORT_EXTENDED, 'comment_count ' . $order );
+					break;
+
+				default:
+					return new WP_Error( 'unsupported sphinx query orderby ' . $wp_query->query['orderby'], 'unsupported sphinx query orderby value' );
+			}//END switch
+		}//END if
+
+		return TRUE;
+	}//END sphinx_query_ordering
+
+	/**
+	 * parse the tax_query param in $wp_query and set the appropriate
+	 * flags in the sphinx client $client.
+	 *
+	 * @retval TRUE if we're able to parse the wp_query.
+	 * @retval WP_Error if we encounter an error or if the wp_query is not
+	 *  supported.
+	 */
+	public function sphinx_query_taxonomy( &$client, $wp_query )
+	{
 		if ( 'AND' == $wp_query->tax_query->relation )
 		{
 			foreach( $wp_query->tax_query->queries as $query )
@@ -356,10 +465,11 @@ class GO_Sphinx
 					// operator = "IN" or "NOT IN"
 					$client->SetFilter( 'tt_id', $query['terms'], ( 'NOT IN' == $query['operator'] ) );
 				}
-			}
+			}//END foreach
 		}
-		else // OR
+		else
 		{
+			// the OR relation:
 			// we do not support the outer OR + inner AND case nor the
 			// outer OR + inner "NOT IN" case
 			$ttids = array();
@@ -373,57 +483,59 @@ class GO_Sphinx
 				$ttids[] = array_merge( $ttids, $query['terms'] );
 			}
 			$client->SetFilter( 'tt_id', $ttids );
-		}
+		}//END else
 
-		// pagination defaults
+		return TRUE;
+	}//END sphinx_query_taxonomy
+
+	/**
+	 * parse the pagination params in $wp_query and set the appropriate
+	 * flags in the sphinx client $client.
+	 */
+	public function sphinx_query_pagination( &$client, $wp_query )
+	{
+		// defaults
 		$offset = 0;
 		$posts_per_page = 10;
+
 		if ( isset( $wp_query->is_paged ) && ( 0 < $wp_query->query['paged'] ) )
 		{
 			if ( isset( $wp_query->query_vars['posts_per_page'] ) )
 			{
 				$posts_per_page = $wp_query->query_vars['posts_per_page'];
 			}
+
 			$offset = ($wp_query->query['paged'] - 1 ) * $posts_per_page;
-		}
+		}//END if
 		$client->SetLimits( $offset, $posts_per_page, 1000 );
+	}//END sphinx_query_pagination
 
-		$client->SetSortMode( SPH_SORT_EXTENDED, 'post_date_gmt DESC' );
-		$client->SetMatchMode( SPH_MATCH_EXTENDED );
-
-		$this->results = $client->Query( '@post_status publish', $this->index_name );
-		if ( FALSE == $this->results )
-		{
-			return new WP_Error( 'sphinx query error', $client->GetLastError() );
-		}
-
-		if ( isset( $this->results['matches'] ) )
-		{
-			foreach( $this->results['matches'] as $match )
-			{
-				$ids[] = $match['id'];
-			}
-		}
-
-		return $ids;
-	}
-
-	// convert slugs or ids in the 'terms' field of $tax_query into an
-	// array of taxonomy_term_ids
-	public function get_tax_query_ids( $tax_query )
+	/**
+	 * parse the post_type params in $wp_query and set the appropriate
+	 * flags in the sphinx client $client.
+	 *
+	 * @retval the equivalent sphinx query string
+	 */
+	public function sphinx_query_post_type( $wp_query )
 	{
-		$ttids = array();
-		foreach( $tax_query['terms'] as $term )
+		$query_str = '@post_status publish';
+		if ( isset( $wp_query->query['post_type'] ) )
 		{
-			$term = get_term_by( $tax_query['field'], $term, $tax_query['taxonomy'] );
-			if ( $term )
+			if ( is_array( $wp_query->query['post_type'] ) )
 			{
-				$ttids[] = $term->term_taxonomy_id;
+				foreach( $wp_query->query['post_type'] as $post_type )
+				{
+					$query_str .= ' ' . '@post_type ' . implode( ' ', $wp_query->query['post_type'] );
+				}
+			}
+			else
+			{
+				$query_str .= ' ' . '@post_type ' . $wp_query->query['post_type'];
 			}
 		}
 
-		return $ttids;
-	}
+		return $query_str;
+	}//END sphinx_query_post_type
 
 }//END GO_Sphinx
 
