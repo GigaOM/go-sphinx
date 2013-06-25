@@ -13,6 +13,7 @@ if (null != top_div){
 	}
 	else {
 		results_text = results_text.replace('results', '(sphinx) results');
+		results_text = results_text.replace('terms:', 'terms in ' + sphinx_results['elapsed_time'] + ' seconds:');
 	}
 	top_div.innerHTML = results_text;
 }

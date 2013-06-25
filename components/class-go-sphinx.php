@@ -10,8 +10,7 @@ class GO_Sphinx
 	public $filter_args = array();
 	public $query_modified = FALSE; // did another plugin modify the current query?
 	public $use_sphinx = TRUE; // can we use sphinx for the current query?
-	public $sphinx_elapsed_time = -1;
-	public $wp_query_request = FALSE;
+	public $search_stats = array();
 	public $admin_cap = 'manage_options';
 	public $filters_to_watch = array(
 		'posts_search',
@@ -167,8 +166,7 @@ class GO_Sphinx
 		$this->query_modified = FALSE;
 		$this->use_sphinx = TRUE;
 		$this->filter_args = array();
-		$this->sphinx_elapsed_time = -1;
-		$this->wp_query_request = FALSE;
+		$this->search_stats = array();
 
 		return $query;
 	}
@@ -249,7 +247,7 @@ class GO_Sphinx
 		// WHERE ID IN ( 5324, 1231) ORDER BY FIELD( ID, 5324, 1231)
 		$t0 = microtime( TRUE );
 		$result_ids = $this->sphinx_query( $wp_query );
-		$this->sphinx_elapsed_time = microtime( TRUE ) - $t0;
+		$this->search_stats['elapsed_time'] = round( microtime( TRUE ) - $t0, 6 );
 
 		if ( is_wp_error( $result_ids ) )
 		{
@@ -259,11 +257,11 @@ class GO_Sphinx
 
 		if ( isset( $_GET['show_source'] ) )
 		{
-			wp_localize_script( 'go-sphinx-js', 'sphinx_results', (array) $this->results );
+			wp_localize_script( 'go-sphinx-js', 'sphinx_results', (array) $this->search_stats );
 		}
 
 		// save the original request before overriding it.
-		$this->wp_query_request = $request;
+		$this->search_stats['wp_request'] = $request;
 
 		if ( 0 < count( $result_ids ) )
 		{
@@ -373,6 +371,7 @@ class GO_Sphinx
 
 		$client->SetMatchMode( SPH_MATCH_EXTENDED );
 		$this->results = $client->Query( implode( ' ', $query_strs ), $this->index_name );
+
 		if ( FALSE == $this->results )
 		{
 			return new WP_Error( 'sphinx query error', $client->GetLastError() );
@@ -385,6 +384,8 @@ class GO_Sphinx
 				$ids[] = $match['id'];
 			}
 		}
+
+		$this->search_stats['sphinx_results'] = $this->results;
 
 		return $ids;
 	}
