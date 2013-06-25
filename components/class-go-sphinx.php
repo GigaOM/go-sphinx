@@ -33,7 +33,7 @@ class GO_Sphinx
 		'posts_limits_request',
 		'posts_clauses_request',
 		'posts_request',
-		);
+	);
 	public $supported_query_vars = array(
 		'author',
 		'category__in',
@@ -59,7 +59,7 @@ class GO_Sphinx
 		'tag_slug__in',
 		'tag_slug__and',
 		'tax_query',
-		);
+	);
 	// supported orderby keywords
 	public $supported_order_by = array(
 		'none',
@@ -70,7 +70,7 @@ class GO_Sphinx
 		'parent',
 		'rand',
 		'comment_count',
-		);
+	);
 
 	public function __construct()
 	{
@@ -92,7 +92,7 @@ class GO_Sphinx
 
 	public function init()
 	{
-		if ( defined( 'GO_SPHINX_DEBUG' ) && GO_SPHINX_DEBUG )
+		if ( isset( $_GET['show_source'] ) )
 		{
 			$plugin_url = untrailingslashit( plugin_dir_url( __FILE__ ) );
 			wp_register_script( 'go-sphinx-js', $plugin_url . '/js/go-sphinx.js', array( 'jquery' ), $this->version, TRUE );
@@ -197,11 +197,6 @@ class GO_Sphinx
 	// query being processed
 	public function check_query( $request )
 	{
-		if ( ! defined( 'USE_SPHINX' ) || ! USE_SPHINX )
-		{
-			return $request;
-		}
-
 		if ( $this->query_modified )
 		{
 			return $request; // already decided to not use
@@ -264,6 +259,8 @@ class GO_Sphinx
 		$t0 = microtime( TRUE );
 		$result_ids = $this->sphinx_query( $wp_query );
 		$this->search_stats['elapsed_time'] = round( microtime( TRUE ) - $t0, 6 );
+		// save the original request before overriding it.
+		$this->search_stats['wp_request'] = $request;
 
 		if ( is_wp_error( $result_ids ) )
 		{
@@ -271,13 +268,10 @@ class GO_Sphinx
 			return $request;
 		}
 
-		if ( defined( 'GO_SPHINX_DEBUG' ) && GO_SPHINX_DEBUG )
+		if ( isset( $_GET['show_source'] ) )
 		{
 			wp_localize_script( 'go-sphinx-js', 'sphinx_results', (array) $this->search_stats );
 		}
-
-		// save the original request before overriding it.
-		$this->search_stats['wp_request'] = $request;
 
 		if ( 0 < count( $result_ids ) )
 		{
@@ -322,8 +316,8 @@ class GO_Sphinx
 	// search or not.
 	public function is_supported_query( $wp_query )
 	{
-		// check config override first
-		if ( ! defined( 'USE_SPHINX' ) || ! USE_SPHINX )
+		// check manual override first
+		if ( isset( $_GET['no_sphinx'] ) )
 		{
 			return FALSE;
 		}
