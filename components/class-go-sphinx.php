@@ -40,7 +40,6 @@ class GO_Sphinx
 		'category__not_in',
 		'category__and',
 		/* 'fields', */
-		/* ignore_sticky_posts, */
 		'offset',
 		'order',
 		'orderby',
@@ -51,6 +50,7 @@ class GO_Sphinx
 		'post_status',
 		'post_type',
 		'posts_per_page',
+		'numberposts',
 		's',
 		'tag_id',
 		'tag__in',
@@ -59,6 +59,13 @@ class GO_Sphinx
 		'tag_slug__in',
 		'tag_slug__and',
 		'tax_query',
+
+		/* these are allowed to pass through either because we allow them
+		   or because they're alternate keys used by WP */
+		'ignore_sticky_posts',
+		'numberposts',
+		'include',
+		'exclude'
 	);
 	// supported orderby keywords
 	public $supported_order_by = array(
@@ -322,6 +329,21 @@ class GO_Sphinx
 			return FALSE;
 		}
 
+		// do not enable sphinx if we receive an unsupported query var.
+		// note we must handle query vars which're taxonomy names.
+		$queried_taxonomies = $this->extract_taxonomies( $wp_query );
+		foreach( $wp_query->query as $key => $val )
+		{
+			if (
+				! in_array( $key, $this->supported_query_vars ) &&
+				! empty( $this->supported_query_vars[ $key ] ) &&
+				! in_array( $key, $queried_taxonomies )
+				)
+			{
+				return FALSE;
+			}
+		}
+
 		if (
 			isset( $wp_query->query['orderby'] ) &&
 			! in_array( $wp_query->query['orderby'], $this->supported_order_by )
@@ -569,6 +591,19 @@ class GO_Sphinx
 		}
 		return $query_str;
 	}//END sphinx_query_post_type
+
+	// find all taxonomies in wp_query's tax_query array and return them
+	// in an array
+	public function extract_taxonomies( $wp_query )
+	{
+		$taxonomies = array();
+
+		foreach( $wp_query->tax_query->queries as $tax_query )
+		{
+			$taxonomies[] = $tax_query['taxonomy'];	
+		}
+		return $taxonomies;
+	}
 
 }//END GO_Sphinx
 
