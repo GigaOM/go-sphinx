@@ -409,6 +409,7 @@ class GO_Sphinx
 					break;
 
 				case 'date':
+				case 'post_date':
 					$client->SetSortMode( SPH_SORT_EXTENDED, 'post_date_gmt ' . $order );
 					break;
 
@@ -432,6 +433,10 @@ class GO_Sphinx
 					return new WP_Error( 'unsupported sphinx query orderby ' . $wp_query->query['orderby'], 'unsupported sphinx query orderby value' );
 			}//END switch
 		}//END if
+		else
+		{
+			$client->SetSortMode( SPH_SORT_EXTENDED, 'post_date_gmt ' . $order );
+		}
 
 		return TRUE;
 	}//END sphinx_query_ordering
