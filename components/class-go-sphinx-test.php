@@ -412,13 +412,6 @@ class GO_Sphinx_Test extends GO_Sphinx
 		if ( 'none' != $orderby )
 		{
 			$client->SetSortMode( SPH_SORT_EXTENDED, $orderby . ' ' . $order );
-			if ( 'comment_count' == $orderby )
-			{
-				// add an additional sort ordering when what we sort
-				// on have lots of collisions (such as comment counts of
-				// 0 or 1).
-				$client->SetSortMode( SPH_SORT_EXTENDED, '@id ASC' );
-			}
 		}
 		$client->SetMatchMode( SPH_MATCH_EXTENDED );
 		$results = $client->Query( '@post_status publish', $this->index_name );
@@ -1870,8 +1863,8 @@ class GO_Sphinx_Test extends GO_Sphinx
 				'match' => TRUE,
 				),
 			array(
-				'wp'    => array( 'comment_count', 'ASC' ),
-				'sp'    => array( 'comment_count', 'ASC' ),
+				'wp'    => array( 'comment_count ID', 'DESC' ),
+				'sp'    => array( 'comment_count DESC, @id', 'DESC' ),
 				'match' => TRUE,
 				),
 		);
