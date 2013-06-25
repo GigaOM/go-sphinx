@@ -75,10 +75,7 @@ class GO_Sphinx
 		}
 		else
 		{
-			if ( defined( 'USE_SPHINX' ) && USE_SPHINX )
-			{
-				$this->add_filters();
-			}
+			$this->add_filters();
 		}
 	}
 
@@ -189,9 +186,14 @@ class GO_Sphinx
 	// query being processed
 	public function check_query( $request )
 	{
+		if ( ! defined( 'USE_SPHINX' ) || ! USE_SPHINX )
+		{
+			return $request;
+		}
+
 		if ( $this->query_modified )
 		{
-			return; // already decided to not use
+			return $request; // already decided to not use
 		}
 
 		$current_filter = current_filter();
