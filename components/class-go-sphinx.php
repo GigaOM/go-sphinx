@@ -60,6 +60,17 @@ class GO_Sphinx
 		'tag_slug__and',
 		'tax_query',
 		);
+	// supported orderby keywords
+	public $supported_order_by = array(
+		'none',
+		'ID',
+		'title',
+		'date',
+		'modified',
+		'parent',
+		'rand',
+		'comment_count',
+		);
 
 	public function __construct()
 	{
@@ -319,14 +330,7 @@ class GO_Sphinx
 
 		if (
 			isset( $wp_query->query['orderby'] ) &&
-			( 'none' != $wp_query->query['orderby'] ) &&
-			( 'ID' != $wp_query->query['orderby'] ) &&
-			( 'title' != $wp_query->query['orderby'] ) &&
-			( 'date' != $wp_query->query['orderby'] ) &&
-			( 'modified' != $wp_query->query['orderby'] ) &&
-			( 'parent' != $wp_query->query['orderby'] ) &&
-			( 'rand' != $wp_query->query['orderby'] ) &&
-			( 'comment_count' != $wp_query->query['orderby'] )
+			! in_array( $wp_query->query['orderby'], $this->supported_order_by )
 			)
 		{
 			return FALSE;
