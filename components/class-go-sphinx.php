@@ -75,13 +75,16 @@ class GO_Sphinx
 		}
 		else
 		{
-			$this->add_filters();
+			if ( defined( 'USE_SPHINX' ) && USE_SPHINX )
+			{
+				$this->add_filters();
+			}
 		}
 	}
 
 	public function init()
 	{
-		if ( isset( $_GET['show_source'] ) )
+		if ( defined( 'GO_SPHINX_DEBUG' ) && GO_SPHINX_DEBUG )
 		{
 			$plugin_url = untrailingslashit( plugin_dir_url( __FILE__ ) );
 			wp_register_script( 'go-sphinx-js', $plugin_url . '/js/go-sphinx.js', array( 'jquery' ), $this->version, TRUE );
@@ -255,7 +258,7 @@ class GO_Sphinx
 			return $request;
 		}
 
-		if ( isset( $_GET['show_source'] ) )
+		if ( defined( 'GO_SPHINX_DEBUG' ) && GO_SPHINX_DEBUG )
 		{
 			wp_localize_script( 'go-sphinx-js', 'sphinx_results', (array) $this->search_stats );
 		}
@@ -306,8 +309,8 @@ class GO_Sphinx
 	// search or not.
 	public function is_supported_query( $wp_query )
 	{
-		// check manual override first
-		if ( isset( $_GET['no_sphinx'] ) )
+		// check config override first
+		if ( ! defined( 'USE_SPHINX' ) || ! USE_SPHINX )
 		{
 			return FALSE;
 		}
@@ -336,14 +339,6 @@ class GO_Sphinx
 	public function sphinx_query( $wp_query )
 	{
 		$ids = array(); // our results
-
-		// we only know about tax queries for now
-/*
-		if ( empty( $wp_query->tax_query->queries ) )
-		{
-			return new WP_Error( 'unsupported sphinx query', 'unsupported sphinx query' );
-		}
-*/
 		$this->client = NULL;
 		$client = $this->client();
 
