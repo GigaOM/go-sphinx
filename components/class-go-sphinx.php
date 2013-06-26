@@ -375,6 +375,12 @@ class GO_Sphinx
 		$client = $this->client();
 
 		// these WP query vars are implemented as sphinx filters
+		// author
+		if ( is_wp_error( $res = $this->sphinx_query_author( $client, $wp_query ) ) )
+		{
+			return $res;
+		}		
+
 		// order and orderby
 		if ( is_wp_error( $res = $this->sphinx_query_ordering( $client, $wp_query ) ) )
 		{
@@ -692,6 +698,49 @@ class GO_Sphinx
 		}
 		return $query_str;
 	}//END sphinx_query_post_type
+	
+	
+	/**
+	 * parse author param in $wp_query and set the appropriate
+	 * flags in the sphinx client $client.
+	 * 
+	 * author param could be one of:
+	 *  1) not set 
+	 *  2) single neg 
+	 *  3) list of 1 or more pos ints
+	 *
+	 * @retval TRUE in all cases...
+	 * No WP_Error need be returned, but if not set or NOT operator, set the sphinx filter appropriately.
+	 */
+	public function sphinx_query_author( &$client, $wp_query )
+	{
+		if ( isset( $wp_query->query['author'] ) )
+		{
+			$author = $wp_query->query['author'];
+			// check for existence of NOT operator ("-"):
+			$exclude_position = strpos( $author, '-' );
+			
+			if ( $exclude_position !== false ) 
+			{
+				// remove from found position
+				$author_id = substr( $author, $exclude_position + 1 );
+				$client->SetFilter( 'post_author', array( (int) $author_id ), TRUE );
+			}
+			else
+			{
+				$author_ids = explode(',', $author);
+				$authors = array();
+				foreach ($author_ids as $v) 
+				{
+					$authors[] = (int) $v;
+				}
+				$client->SetFilter( 'post_author', $authors );
+			} // END IF check for NOT operator
+			
+		} // END IF check for author param
+		
+		return TRUE;
+	}//END sphinx_query_author	
 
 	// find all taxonomies in wp_query's tax_query array and return them
 	// in an array
