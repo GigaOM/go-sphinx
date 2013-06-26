@@ -39,7 +39,6 @@ class GO_Sphinx
 		'category__in',
 		'category__not_in',
 		'category__and',
-		/* 'fields', */
 		'offset',
 		'order',
 		'orderby',
@@ -65,7 +64,8 @@ class GO_Sphinx
 		'ignore_sticky_posts',
 		'numberposts',
 		'include',
-		'exclude'
+		'exclude',
+		'fields',
 	);
 	// supported orderby keywords
 	public $supported_order_by = array(
@@ -90,6 +90,7 @@ class GO_Sphinx
 		if ( is_admin() )
 		{
 			$this->admin();
+			$this->add_filters();
 		}
 		else
 		{
@@ -265,6 +266,7 @@ class GO_Sphinx
 		// WHERE ID IN ( 5324, 1231) ORDER BY FIELD( ID, 5324, 1231)
 		$t0 = microtime( TRUE );
 		$result_ids = $this->sphinx_query( $wp_query );
+
 		$this->search_stats['elapsed_time'] = round( microtime( TRUE ) - $t0, 6 );
 		// save the original request before overriding it.
 		$this->search_stats['wp_request'] = $request;
@@ -352,7 +354,6 @@ class GO_Sphinx
 			return FALSE;
 		}
 
-		//TODO: detect and block queries we cannot support here
 		return TRUE;
 	}
 
@@ -372,6 +373,12 @@ class GO_Sphinx
 
 		// tax_query
 		if ( is_wp_error( $res = $this->sphinx_query_taxonomy( $client, $wp_query ) ) )
+		{
+			return $res;
+		}
+
+		// post__in and post__not_in
+		if ( is_wp_error( $res = $this->sphinx_query_post_in_not_in( $client, $wp_query ) ) )
 		{
 			return $res;
 		}
@@ -507,13 +514,42 @@ class GO_Sphinx
 					return new WP_Error( 'unsupported sphinx query', 'unsupported sphinx query (OR relation with AND or "NOT IN" operator(s))' );
 				}
 				$wp_query->tax_query->transform_query( $query, 'term_taxonomy_id' );
-				$ttids[] = array_merge( $ttids, $query['terms'] );
+				$ttids = array_merge( $ttids, $query['terms'] );
 			}
+
 			$client->SetFilter( 'tt_id', $ttids );
 		}//END else
 
 		return TRUE;
 	}//END sphinx_query_taxonomy
+
+	/**
+	 * parse the post__in and post__not_in params in $wp_query and set the
+	 * appropriate flags in the sphinx client $client.
+	 *
+	 * @retval TRUE if we're able to parse the wp_query.
+	 * @retval WP_Error if we encounter an error or if the wp_query is not
+	 *  supported.
+	 */
+	public function sphinx_query_post_in_not_in( &$client, $wp_query )
+	{
+		if ( ! isset( $wp_query->query['post__in'] ) && ! isset( $wp_query->query['post__not_in'] ) )
+		{
+			return TRUE;
+		}
+
+		if ( ! empty( $wp_query->query['post__in'] ) )
+		{
+			$client->SetFilter( '@id', $wp_query->query['post__in'] );
+		}
+
+		if ( ! empty( $wp_query->query['post__not_in'] ) )
+		{
+			$client->SetFilter( '@id', $wp_query->query['post__not_in'], TRUE );
+		}
+
+		return TRUE;
+	}
 
 	/**
 	 * parse the pagination params in $wp_query and set the appropriate
@@ -525,15 +561,20 @@ class GO_Sphinx
 		$offset = 0;
 		$posts_per_page = 10;
 
-		if ( isset( $wp_query->query['paged'] ) && ( 0 < $wp_query->query['paged'] ) )
+		if ( isset( $wp_query->query['posts_per_page'] ) && ( 0 < $wp_query->query['posts_per_page'] ) )
 		{
-			if ( isset( $wp_query->query_vars['posts_per_page'] ) )
-			{
-				$posts_per_page = $wp_query->query_vars['posts_per_page'];
-			}
+			$posts_per_page = $wp_query->query['posts_per_page'];
+		}
 
+		if ( isset( $wp_query->query['offset'] ) && ( 0 < $wp_query->query['offset'] ) )
+		{
+			$offset = $wp_query->query['offset'];
+		}
+		elseif ( isset( $wp_query->query['paged'] ) && ( 0 < $wp_query->query['paged'] ) )
+		{
 			$offset = ($wp_query->query['paged'] - 1 ) * $posts_per_page;
-		}//END if
+		}
+
 		$client->SetLimits( $offset, $posts_per_page, 1000 );
 	}//END sphinx_query_pagination
 
@@ -548,13 +589,16 @@ class GO_Sphinx
 		$query_str = '';
 		if ( isset( $wp_query->query['post_type'] ) )
 		{
-			if ( is_array( $wp_query->query['post_type'] ) )
+			if ( 'any' != $wp_query->query['post_type'] )
 			{
-				$query_str = '@post_type ' . implode( ' | ', $wp_query->query['post_type'] );
-			}
-			else
-			{
-				$query_str = '@post_type ' . $wp_query->query['post_type'];
+				if ( is_array( $wp_query->query['post_type'] ) )
+				{
+					$query_str = '@post_type ' . implode( ' | ', $wp_query->query['post_type'] );
+				}
+				else
+				{
+					$query_str = '@post_type ' . $wp_query->query['post_type'];
+				}
 			}
 		}
 		else
