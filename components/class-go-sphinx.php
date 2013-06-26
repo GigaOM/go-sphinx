@@ -374,6 +374,7 @@ class GO_Sphinx
 		$this->client = NULL;
 		$client = $this->client();
 
+		// these WP query vars are implemented as sphinx filters
 		// order and orderby
 		if ( is_wp_error( $res = $this->sphinx_query_ordering( $client, $wp_query ) ) )
 		{
@@ -392,9 +393,16 @@ class GO_Sphinx
 			return $res;
 		}
 
+		// post_parent
+		if ( is_wp_error( $res = $this->sphinx_query_post_parent( $client, $wp_query ) ) )
+		{
+			return $res;
+		}
+
 		// pagination
 		$this->sphinx_query_pagination( $client, $wp_query );
 
+		// these quyery vars are implemented as sphinx query string
 		// post_type
 		$query_strs = array();
 		$query_strs[] = $this->sphinx_query_post_type( $wp_query );
@@ -537,8 +545,6 @@ class GO_Sphinx
 	 * appropriate flags in the sphinx client $client.
 	 *
 	 * @retval TRUE if we're able to parse the wp_query.
-	 * @retval WP_Error if we encounter an error or if the wp_query is not
-	 *  supported.
 	 */
 	public function sphinx_query_post_in_not_in( &$client, $wp_query )
 	{
@@ -556,6 +562,32 @@ class GO_Sphinx
 		{
 			$client->SetFilter( '@id', $wp_query->query['post__not_in'], TRUE );
 		}
+
+		return TRUE;
+	}
+
+	/**
+	 * parse the post_parent param in $wp_query and set the appropriate
+	 * flags in the sphinx client $client.
+	 *
+	 * @retval TRUE if we're able to parse the wp_query.
+	 * @retval WP_Error if we encounter an error or if the wp_query is not
+	 *  supported.
+	 */
+	public function sphinx_query_post_parent( &$client, $wp_query )
+	{
+		if ( ! isset( $wp_query->query['post_parent'] ) )
+		{
+			return TRUE;
+		}
+
+		// WP_Query only allows a single post_parent id
+		if ( ! is_numeric( $wp_query->query['post_parent'] ) )
+		{
+			return new WP_Error( 'invalid post_parent id', 'invalid post_parent id (' . $wp_query->query['post_parent'] . ')' );
+		}
+
+		$client->SetFilter( 'post_parent', $wp_query->query['post_parent'] );
 
 		return TRUE;
 	}
