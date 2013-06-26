@@ -382,9 +382,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 				'posts_per_page' => 10,
 				'orderby'        => $orderby,
 				'order'          => $order,
-
 		) );
-
 		if ( $results->posts )
 		{
 			$ids = array();
@@ -397,7 +395,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 		}
 		else
 		{
-			echo 'no post found';
+			echo "no post found\n\n";
 			return FALSE;
 		}
 	}//END wp_query_ten_most_recent_posts
@@ -754,7 +752,6 @@ class GO_Sphinx_Test extends GO_Sphinx
 
 		$query_results = new WP_Query(
 			array(
-				'fields'         => 'ids',
 				'post_type'      => 'any',
 				'post_status'    => 'publish',
 				'posts_per_page' => 10,
@@ -764,11 +761,12 @@ class GO_Sphinx_Test extends GO_Sphinx
 				) );
 
 		// make sure keys from $query_terms are not in $query_results...
+		$query_result_ids = $this->get_ids_from_posts( $query_results->posts );
 		$test_failed = FALSE;
 		foreach ( $query_terms as $post_id => $term_obj )
 		{
-			if ( ( in_array( $post_id, $query_results->posts ) && ! $is_IN_test ) ||
-				 ( ! in_array( $post_id, $query_results->posts ) && $is_IN_test ) )
+			if ( ( in_array( $post_id, $query_result_ids ) && ! $is_IN_test ) ||
+				 ( ! in_array( $post_id, $query_result_ids ) && $is_IN_test ) )
 			{
 				// we shouldn't find any post from $query_terms in the search
 				// results when not performing the "IN" test,
@@ -909,9 +907,9 @@ class GO_Sphinx_Test extends GO_Sphinx
 				'posts_per_page' => 10,
 				'orderby'        => 'date', // or 'modified'?
 				'order'          => 'DESC',
-				'fields'         => 'ids',
 				's'              => '"' . $term->name . '"',
 		) );
+		$wpq_result_ids = $this->get_ids_from_posts( $wpq_results->posts );
 
 		$this->client = FALSE; // ensure we get a new instance
 		$client = $this->client();
@@ -932,20 +930,20 @@ class GO_Sphinx_Test extends GO_Sphinx
 
 		$spx_result_ids = $this->extract_sphinx_matches_ids( $spx_results );
 
-		if ( count( $wpq_results->posts ) >= count( $spx_result_ids ) )
+		if ( count( $wpq_result_ids ) >= count( $spx_result_ids ) )
 		{
-			$diff = array_diff( $wpq_results->posts, $spx_result_ids );
-			$source_len = count( $wpq_results->posts );
+			$diff = array_diff( $wpq_result_ids, $spx_result_ids );
+			$source_len = count( $wpq_result_ids );
 		}
 		else
 		{
-			$diff = array_diff( $spx_result_ids, $wpq_results->posts );
+			$diff = array_diff( $spx_result_ids, $wpq_result_ids );
 			$source_len = count( $spx_result_ids );
 		}
 
 		echo "search term: \"$term->name\"\n";
 		echo "WP_Query results:\n";
-		print_r( $wpq_results->posts );
+		print_r( $wpq_result_ids );
 		echo "Sphinx results:\n";
 		print_r( $spx_result_ids );
 		echo "difference:\n";
@@ -1101,10 +1099,10 @@ class GO_Sphinx_Test extends GO_Sphinx
 				'posts_per_page' => 10,
 				'orderby'        => 'date', // or 'modified'?
 				'order'          => 'DESC',
-				'fields'         => 'ids',
 				'post__not_in'   => $excluded_posts,
 		) );
 
+		$wpq_result_ids = $this->get_ids_from_posts( $wpq_results->posts );
 		$test_failed = FALSE;
 
 		if ( $wpq_results->post_count != 10 )
@@ -1114,7 +1112,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 		}
 		else
 		{
-			$diff = array_diff( $wpq_results->posts, $excluded_posts );
+			$diff = array_diff( $wpq_result_ids, $excluded_posts );
 			if ( count( $diff ) == 10 )
 			{
 				echo "WP_Query results do not include any id from the exclusion list. PASSED.\n\n";
@@ -1197,11 +1195,12 @@ class GO_Sphinx_Test extends GO_Sphinx
 				'posts_per_page' => 10,
 				'orderby'        => 'date', // or 'modified'?
 				'order'          => 'DESC',
-				'fields'         => 'ids',
 				'post__in'       => array($id_to_test),
 		) );
 
-		
+		$wpq_result_ids = $this->get_ids_from_posts( $wpq_results->posts );
+
+		$test_failed = FALSE;
 		if ( $wpq_results->post_count != 1 )
 		{
 			echo "did not find expected number of WP_Query results (1). FAILED\n\n";
@@ -1209,7 +1208,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 		}
 		else
 		{
-			if ( $wpq_results->posts[0] == $id_to_test )
+			if ( $wpq_result_ids[0] == $id_to_test )
 			{
 				echo "WP_Query results for test $this->test_count PASSED.\n\n";
 			}
@@ -1244,7 +1243,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 		}
 		else
 		{
-			if ( $wpq_results->posts[0] == $id_to_test )
+			if ( $wpq_result_ids[0] == $id_to_test )
 			{
 				echo "Sphinx results for test $this->test_count: PASSED.\n\n";
 			}
@@ -1289,7 +1288,6 @@ class GO_Sphinx_Test extends GO_Sphinx
 
 		$query_results = new WP_Query(
 			array(
-				'fields'         => 'ids',
 				'post_type'      => 'any',
 				'post_status'    => 'publish',
 				'posts_per_page' => 10,
@@ -1300,10 +1298,12 @@ class GO_Sphinx_Test extends GO_Sphinx
 				) );
 
 		// make sure keys (post_id) from $query_terms are not in $query_results
+		$query_result_ids = $this->get_ids_from_posts( $query_results->posts );
+
 		$test_failed = FALSE;
 		foreach ( $query_terms as $post_id => $term_obj )
 		{
-			if ( in_array( $post_id, $query_results->posts ) )
+			if ( in_array( $post_id, $query_result_ids ) )
 			{
 				$test_failed = TRUE;
 				break;
@@ -1551,8 +1551,8 @@ class GO_Sphinx_Test extends GO_Sphinx
 				'orderby'        => 'date',
 				'order'          => 'DESC',
 				$query_var       => $use_slugs ? $the_term->slug : $the_term->term_id,
-				'fields'         => 'ids',
 		) );
+		$wp_result_ids = $this->get_ids_from_posts( $wp_results->posts );
 
 		$test_failed = FALSE;
 		if ( $wp_results->post_count == 0 )
@@ -1562,7 +1562,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 		}
 		else
 		{
-			echo 'WP_Query results: ' . implode( ', ', $wp_results->posts ). "\n\n";
+			echo 'WP_Query results: ' . implode( ', ', $wp_result_ids ). "\n\n";
 		}
 
 		// now with sphinx
@@ -1586,7 +1586,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 			echo '  Sphinx results: ' . implode( ', ', $sp_result_ids ). "\n\n";
 		}
 
-		$test_failed = ( $test_failed || ( ! $this->compare_results( $wp_results->posts, $sp_result_ids ) ) );
+		$test_failed = ( $test_failed || ( ! $this->compare_results( $wp_result_ids, $sp_result_ids ) ) );
 		echo "---\n\n";
 
 		return ( ! $test_failed );
@@ -1641,12 +1641,13 @@ class GO_Sphinx_Test extends GO_Sphinx
 				'orderby'        => 'date',
 				'order'          => 'DESC',
 				'category__and'  => $category_ids,
-				'fields'         => 'ids',
 		) );
+
+		$wp_result_ids = $this->get_ids_from_posts( $wp_results->posts );
 
 		$test_failed = FALSE;
 		if ( ( $wp_results->post_count == 0 ) ||
-			 ! in_array( $the_post->ID, $wp_results->posts ) )
+			 ! in_array( $the_post->ID, $wp_result_ids ) )
 		{
 			echo "did not find expected post ($the_post->ID) in WP_Query results. FAILED.\n\n";
 			$test_failed = TRUE;
@@ -1681,7 +1682,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 			echo "Sphinx results included the expected post ($the_post->ID). PASSED\n\n";
 		}
 
-		$test_failed = ( $test_failed || ( ! $this->compare_results( $wp_results->posts, $sp_result_ids ) ) );
+		$test_failed = ( $test_failed || ( ! $this->compare_results( $wp_result_ids, $sp_result_ids ) ) );
 		echo "---\n\n";
 
 		return ( ! $test_failed );
@@ -1744,8 +1745,9 @@ class GO_Sphinx_Test extends GO_Sphinx
 				'orderby'        => 'date',
 				'order'          => 'DESC',
 				$query_var       => $query_terms,
-				'fields'         => 'ids',
 		) );
+
+		$wp_result_ids = $this->get_ids_from_posts( $wp_results->posts );
 
 		$test_failed = FALSE;
 		if ( $wp_results->post_count == 0 )
@@ -1755,7 +1757,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 		}
 		else
 		{
-			echo 'WP_Query results: ' . implode( ', ', $wp_results->posts ). "\n\n";
+			echo 'WP_Query results: ' . implode( ', ', $wp_result_ids ). "\n\n";
 		}
 
 		// now with sphinx
@@ -1781,7 +1783,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 			echo '  Sphinx results: ' . implode( ', ', $sp_result_ids ). "\n\n";
 		}
 
-		$test_failed = ( $test_failed || ( ! $this->compare_results( $wp_results->posts, $sp_result_ids ) ) );
+		$test_failed = ( $test_failed || ( ! $this->compare_results( $wp_result_ids, $sp_result_ids ) ) );
 		echo "---\n\n";
 
 		return ( ! $test_failed );
@@ -1956,7 +1958,6 @@ class GO_Sphinx_Test extends GO_Sphinx
 				'orderby'        => 'ID',
 				'order'          => 'DESC',
 				'post_parent'    => $the_post->post_parent,
-				'fields'         => 'ids',
 		) );
 
 		if ( 0 == $wp_results->post_count )
@@ -1964,7 +1965,10 @@ class GO_Sphinx_Test extends GO_Sphinx
 			echo "no WP_Query results. FAILED.\n\n---\n\n";
 			return FALSE;
 		}
-		echo 'WP_Query of child posts of ' . $the_post->post_parent . ': ' . implode( ', ', $wp_results->posts ) . "\n\n";
+
+		$wp_result_ids = $this->get_ids_from_posts( $wp_results->posts );
+
+		echo 'WP_Query of child posts of ' . $the_post->post_parent . ': ' . implode( ', ', $wp_result_ids ) . "\n\n";
 
 		// sphinx
 		$this->client = FALSE; // get a new instance
@@ -1986,10 +1990,23 @@ class GO_Sphinx_Test extends GO_Sphinx
 
 		echo 'Sphinx query of child posts of ' . $the_post->post_parent . ': ' . implode( ', ', $sp_result_ids ) . "\n\n";
 
-		$res = $this->compare_results( $wp_results->posts, $sp_result_ids );
+		$res = $this->compare_results( $wp_result_ids, $sp_result_ids );
 		echo "---\n\n";
 
 		return $res;
 	}//END post_parent_test
+
+	// get an array of post ids from an array of post objects
+	public function get_ids_from_posts( $posts )
+	{
+		$ids = array();
+
+		foreach( $posts as $post )
+		{
+			$ids[] = $post->ID;
+		}
+
+		return $ids;
+	}
 
 }//END GO_Sphinx_Test
