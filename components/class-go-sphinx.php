@@ -66,6 +66,7 @@ class GO_Sphinx
 		'include',
 		'exclude',
 		'fields',
+		'suppress_filters',
 	);
 	// supported orderby keywords
 	public $supported_order_by = array(
@@ -347,7 +348,7 @@ class GO_Sphinx
 		{
 			if (
 				! in_array( $key, $this->supported_query_vars ) &&
-				! empty( $this->supported_query_vars[ $key ] ) &&
+				! empty( $wp_query->query[ $key ] ) &&
 				! in_array( $key, $queried_taxonomies )
 				)
 			{
@@ -635,10 +636,13 @@ class GO_Sphinx
 	 */
 	public function sphinx_query_keyword( $wp_query )
 	{
-		$query_str = '';
+		// If a search pattern is specified, load the posts that match
+		if ( ! isset( $wp_query->query['s'] ) || empty( $wp_query->query['s'] ) )
+		{
+			return '';
+		}
 
-
-		return $query_str;
+		return '@post_content ' . $wp_query->query['s'];
 	}
 
 	/**
