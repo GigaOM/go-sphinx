@@ -403,11 +403,13 @@ class GO_Sphinx
 		$this->sphinx_query_pagination( $client, $wp_query );
 
 		// these quyery vars are implemented as sphinx query string
-		// post_type
+
 		$query_strs = array();
+
+		$query_strs[] = $this->sphinx_query_keyword( $wp_query );
+
 		$query_strs[] = $this->sphinx_query_post_type( $wp_query );
 
-		// post_status
 		$query_strs[] = $this->sphinx_query_post_status( $wp_query );
 
 		$client->SetMatchMode( SPH_MATCH_EXTENDED );
@@ -618,6 +620,20 @@ class GO_Sphinx
 
 		$client->SetLimits( $offset, $posts_per_page, 1000 );
 	}//END sphinx_query_pagination
+
+	/**
+	 * parse the keyword ('s') param in $wp_query and convert it to an
+	 * equivalent sphinx query string.
+	 *
+	 * @retval the equivalent sphinx query string
+	 */
+	public function sphinx_query_keyword( $wp_query )
+	{
+		$query_str = '';
+
+
+		return $query_str;
+	}
 
 	/**
 	 * parse the post_type param in $wp_query and convert it to an equivalent
