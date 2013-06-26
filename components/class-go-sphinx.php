@@ -90,7 +90,16 @@ class GO_Sphinx
 		if ( is_admin() )
 		{
 			$this->admin();
-			$this->add_filters();
+
+			// optionally enable sphinx in admin dashboard/ajax. this allows
+			// us to run our tests in two modes: one to compare sphinx
+			// results with wp query results (without any query param), and
+			// one to compare the results of our implementation with the
+			// results of direct sphinx queries (with 'sphinx_query' param).
+			if ( isset( $_GET['sphinx_query'] ) )
+			{
+				$this->add_filters();
+			}
 		}
 		else
 		{
@@ -100,7 +109,7 @@ class GO_Sphinx
 
 	public function init()
 	{
-		if ( isset( $_GET['show_source'] ) )
+		if ( isset( $_GET['show_source'] ) && current_user_can( 'edit_others_posts' ) )
 		{
 			$plugin_url = untrailingslashit( plugin_dir_url( __FILE__ ) );
 			wp_register_script( 'go-sphinx-js', $plugin_url . '/js/go-sphinx.js', array( 'jquery' ), $this->version, TRUE );
@@ -277,7 +286,7 @@ class GO_Sphinx
 			return $request;
 		}
 
-		if ( isset( $_GET['show_source'] ) )
+		if ( isset( $_GET['show_source'] ) && current_user_can( 'edit_others_posts' ) )
 		{
 			wp_localize_script( 'go-sphinx-js', 'sphinx_results', (array) $this->search_stats );
 		}
@@ -326,7 +335,7 @@ class GO_Sphinx
 	public function is_supported_query( $wp_query )
 	{
 		// check manual override first
-		if ( isset( $_GET['no_sphinx'] ) )
+		if ( isset( $_GET['no_sphinx'] ) && current_user_can( 'edit_others_posts' ) )
 		{
 			return FALSE;
 		}
