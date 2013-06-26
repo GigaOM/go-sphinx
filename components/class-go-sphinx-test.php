@@ -1860,8 +1860,8 @@ class GO_Sphinx_Test extends GO_Sphinx
 				'match' => TRUE,
 				),
 			array(
-				'wp'    => array( 'parent', 'DESC' ),
-				'sp'    => array( 'post_parent', 'DESC' ),
+				'wp'    => array( 'parent ID', 'DESC' ),
+				'sp'    => array( 'post_parent DESC, @id', 'DESC' ),
 				'match' => TRUE,
 				),
 			array(
@@ -1936,7 +1936,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 		$the_post = FALSE;
 		foreach( $this->ten_most_recent_hits_wp as $post )
 		{
-			if ( isset( $post->post_parent ) && ( 0 < $post->post_parent ) )
+			if ( isset( $post->post_parent ) )
 			{
 				$the_post = $post;
 				break;
