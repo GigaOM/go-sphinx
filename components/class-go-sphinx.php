@@ -36,6 +36,7 @@ class GO_Sphinx
 	);
 	public $supported_query_vars = array(
 		'author',
+		'author_name',
 		'category__in',
 		'category__not_in',
 		'category__and',
@@ -110,7 +111,7 @@ class GO_Sphinx
 
 	public function init()
 	{
-		if ( isset( $_GET['show_source'] ) && current_user_can( 'edit_others_posts' ) )
+		if ( isset( $_GET['debug'] ) && current_user_can( 'edit_others_posts' ) )
 		{
 			$plugin_url = untrailingslashit( plugin_dir_url( __FILE__ ) );
 			wp_register_script( 'go-sphinx-js', $plugin_url . '/js/go-sphinx.js', array( 'jquery' ), $this->version, TRUE );
@@ -241,9 +242,7 @@ class GO_Sphinx
 	// use sphinx for the search results
 	public function split_the_query( $split_the_query, $wp_query )
 	{
-		// cannot use sphinx if the query has been modified by another
-		// plugin
-
+		// cannot use sphinx if the query has been modified by another plugin
 		if ( $this->query_modified )
 		{
 			$this->use_sphinx = FALSE;
@@ -287,7 +286,7 @@ class GO_Sphinx
 			return $request;
 		}
 
-		if ( isset( $_GET['show_source'] ) && current_user_can( 'edit_others_posts' ) )
+		if ( isset( $_GET['debug'] ) && current_user_can( 'edit_others_posts' ) )
 		{
 			wp_localize_script( 'go-sphinx-js', 'sphinx_results', (array) $this->search_stats );
 		}
