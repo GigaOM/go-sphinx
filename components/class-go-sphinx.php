@@ -511,6 +511,16 @@ class GO_Sphinx
 			{
 				// use WP_Tax_Query::transform_query() to look up the term tax ids
 				$wp_query->tax_query->transform_query( $query, 'term_taxonomy_id' );
+				if ( empty( $query['terms'] ) )
+				{
+					// if a tax query has no term then it means some or all 
+					// of the terms could not be resolved. in this case we
+					// set a filter that'll block all results to ensure
+					// the final query result will be empty
+					// see https://github.com/GigaOM/legacy-pro/issues/673
+					$client->SetFilter( 'tt_id', array( -1 ) );
+					break;
+				}
 				if ( 'AND' == $query['operator'] )
 				{
 					// one filter per ttid
@@ -534,6 +544,12 @@ class GO_Sphinx
 			$ttids = array();
 			foreach( $wp_query->tax_query->queries as $query )
 			{
+				if ( empty( $query['terms'] ) )
+				{
+					// see notes above about github issue 673
+					$client->SetFilter( 'tt_id', array( -1 ) );
+					break;
+				}
 				if ( 'IN' != $query['operator'] )
 				{
 					return new WP_Error( 'unsupported sphinx query', 'unsupported sphinx query (OR relation with AND or "NOT IN" operator(s))' );
