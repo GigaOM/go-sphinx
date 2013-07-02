@@ -11,6 +11,8 @@ class GO_Sphinx
 	public $query_modified = FALSE; // did another plugin modify the current query?
 	public $use_sphinx = TRUE; // can we use sphinx for the current query?
 	public $search_stats = array();
+	public $posts_per_page = 10;
+	public $max_results = 1000;
 	public $admin_cap = 'manage_options';
 	public $filters_to_watch = array(
 		'posts_search',
@@ -185,6 +187,8 @@ class GO_Sphinx
 		add_filter( 'found_posts_query', array( $this, 'found_posts_query' ), 9999 );
 		add_filter( 'found_posts', array( $this, 'found_posts' ), 9999, 2 );
 
+		// used for scriblio facets integration
+		add_filter( 'scriblio_pre_get_matching_post_ids', array( $this, 'scriblio_pre_get_matching_post_ids' ), 10, 2 );
 	}
 
 	// initialize our states in this callback, which is invoked at the
@@ -366,6 +370,39 @@ class GO_Sphinx
 		return TRUE;
 	}
 
+	// used for scriblio facets integration. this filter callback is
+	// invoked before scriblio facets tries to execute a sql query
+	// to get the query results. if we have scriblio results here then
+	// we can return it in $result_ids, up to $max number of them.
+	// we return $result_ids if we're able to use sphinx results, else
+	// we return FALSE.
+	//
+	// caveat: we will only return the smaller of $max or $this->max_results
+	//
+	public function scriblio_pre_get_matching_post_ids( $max )
+	{
+		if ( FALSE == $this->results )
+		{
+			return FALSE;
+		}
+
+		$num_added = 0;
+		$result_ids = array();
+		if ( isset( $this->results['matches'] ) )
+		{
+			foreach( $this->results['matches'] as $match )
+			{
+				$result_ids[] = $match['id'];
+				$num_added ++;
+				if ( $num_added >= $max )
+				{
+					break;
+				}
+			}
+		}
+		return $result_ids;
+	}
+
 	// perform a sphinx query that's equivalent to the $wp_query
 	// returns WP_Error if we cannot use sphinx for this query.
 	public function sphinx_query( $wp_query )
@@ -428,9 +465,19 @@ class GO_Sphinx
 
 		if ( isset( $this->results['matches'] ) )
 		{
+			$num_results = 0;
 			foreach( $this->results['matches'] as $match )
 			{
 				$ids[] = $match['id'];
+
+				// implement our own result set sizing here, since we
+				// had saved $this->max_results in case we need more than
+				// what the current request asks for
+				$num_results ++;
+				if ( $this->posts_per_page <= $num_results )
+				{
+					break;
+				}
 			}
 		}
 
@@ -624,11 +671,11 @@ class GO_Sphinx
 	{
 		// defaults
 		$offset = 0;
-		$posts_per_page = 10;
+		$this->posts_per_page = 10;
 
 		if ( isset( $wp_query->query['posts_per_page'] ) && ( 0 < $wp_query->query['posts_per_page'] ) )
 		{
-			$posts_per_page = $wp_query->query['posts_per_page'];
+			$this->posts_per_page = $wp_query->query['posts_per_page'];
 		}
 
 		if ( isset( $wp_query->query['offset'] ) && ( 0 < $wp_query->query['offset'] ) )
@@ -640,7 +687,7 @@ class GO_Sphinx
 			$offset = ($wp_query->query['paged'] - 1 ) * $posts_per_page;
 		}
 
-		$client->SetLimits( $offset, $posts_per_page, 1000 );
+		$client->SetLimits( $offset, $this->max_results, $this->max_results );
 	}//END sphinx_query_pagination
 
 	/**
