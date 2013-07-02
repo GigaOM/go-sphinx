@@ -379,7 +379,7 @@ class GO_Sphinx
 	//
 	// caveat: we will only return the smaller of $max or $this->max_results
 	//
-	public function scriblio_pre_get_matching_post_ids( $max )
+	public function scriblio_pre_get_matching_post_ids( $ignorable, $max )
 	{
 		if ( FALSE == $this->results )
 		{
