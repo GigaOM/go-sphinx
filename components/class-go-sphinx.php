@@ -118,7 +118,7 @@ class GO_Sphinx
 
 	public function init()
 	{
-		if ( isset( $_GET[ $this->qv_debug ] ) && current_user_can( 'edit_others_posts' ) )
+		if ( $this->is_debug() )
 		{
 			$plugin_url = untrailingslashit( plugin_dir_url( __FILE__ ) );
 			wp_register_script( 'go-sphinx-js', $plugin_url . '/js/go-sphinx.js', array( 'jquery' ), $this->version, TRUE );
@@ -240,6 +240,12 @@ class GO_Sphinx
 		return GO_Sphinx::SPHINX_OVERRIDE_OFF;
 	}
 
+	// check if we're in debug mode or not
+	public function is_debug()
+	{
+		return ( isset( $_GET[ $this->qv_debug ] ) && current_user_can( 'edit_others_posts' ) );
+	}
+
 	// the callback to track whether another plugin has altered the
 	// query being processed
 	public function check_query( $request )
@@ -342,7 +348,7 @@ class GO_Sphinx
 			return $request;
 		}
 
-		if ( isset( $_GET[ $this->qv_debug ] ) && current_user_can( 'edit_others_posts' ) )
+		if ( $this->is_debug() )
 		{
 			wp_localize_script( 'go-sphinx-js', 'sphinx_results', (array) $this->search_stats );
 		}
