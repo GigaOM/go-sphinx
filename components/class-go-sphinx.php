@@ -2,6 +2,9 @@
 
 class GO_Sphinx
 {
+	const SPHINX_OVERRIDE_ON  = 1;
+	const SPHINX_OVERRIDE_OFF = 2;
+
 	public $admin  = FALSE;
 	public $client = FALSE;
 	public $test   = FALSE;
@@ -14,6 +17,8 @@ class GO_Sphinx
 	public $posts_per_page = 10;
 	public $max_results = 1000;
 	public $admin_cap = 'manage_options';
+	public $qv_debug = 'go-sphinx-debug';
+	public $qv_use_sphinx = 'go-sphinx-use';
 	public $filters_to_watch = array(
 		'posts_search',
 		'posts_where',
@@ -99,8 +104,9 @@ class GO_Sphinx
 			// us to run our tests in two modes: one to compare sphinx
 			// results with wp query results (without any query param), and
 			// one to compare the results of our implementation with the
-			// results of direct sphinx queries (with 'sphinx_query' param).
-			if ( isset( $_GET['sphinx_query'] ) )
+			// results of direct sphinx queries (with the
+			// $this->qv_use_sphinx=1 url param).
+			if ( GO_Sphinx::SPHINX_OVERRIDE_ON == $this->get_sphinx_override() )
 			{
 				$this->add_filters();
 			}
@@ -113,7 +119,7 @@ class GO_Sphinx
 
 	public function init()
 	{
-		if ( isset( $_GET['debug'] ) && current_user_can( 'edit_others_posts' ) )
+		if ( isset( $_GET[ $this->qv_debug ] ) && current_user_can( 'edit_others_posts' ) )
 		{
 			$plugin_url = untrailingslashit( plugin_dir_url( __FILE__ ) );
 			wp_register_script( 'go-sphinx-js', $plugin_url . '/js/go-sphinx.js', array( 'jquery' ), $this->version, TRUE );
@@ -216,6 +222,26 @@ class GO_Sphinx
 		}
 	}
 
+	// check if there is a user override to turn sphinx on or off
+	// using query params.
+	// @retval FALSE if there is no override
+	// @retval 1 if sphinx should be turned on
+	// @retval 2 if sphinx should be turned off
+	public function get_sphinx_override()
+	{
+		if ( ! isset( $_GET[ $this->qv_use_sphinx ] ) )
+		{
+			return FALSE;
+		}
+
+		if ( '1' == $_GET[ $this->qv_use_sphinx ] )
+		{
+			return GO_Sphinx::SPHINX_OVERRIDE_ON;
+		}
+
+		return GO_Sphinx::SPHINX_OVERRIDE_OFF;
+	}
+
 	// the callback to track whether another plugin has altered the
 	// query being processed
 	public function check_query( $request )
@@ -290,7 +316,7 @@ class GO_Sphinx
 			return $request;
 		}
 
-		if ( isset( $_GET['debug'] ) && current_user_can( 'edit_others_posts' ) )
+		if ( isset( $_GET[ $this->qv_debug ] ) && current_user_can( 'edit_others_posts' ) )
 		{
 			wp_localize_script( 'go-sphinx-js', 'sphinx_results', (array) $this->search_stats );
 		}
@@ -339,7 +365,7 @@ class GO_Sphinx
 	public function is_supported_query( $wp_query )
 	{
 		// check manual override first
-		if ( isset( $_GET['no_sphinx'] ) && current_user_can( 'edit_others_posts' ) )
+		if ( ( GO_Sphinx::SPHINX_OVERRIDE_OFF == $this->get_sphinx_override() ) && current_user_can( 'edit_others_posts' ) )
 		{
 			return FALSE;
 		}
