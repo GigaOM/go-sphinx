@@ -12,7 +12,6 @@ class GO_Sphinx
 	public $index_name = FALSE;
 	public $filter_args = array();
 	public $query_modified = FALSE; // did another plugin modify the current query?
-	public $use_sphinx = TRUE; // can we use sphinx for the current query?
 	public $search_stats = array();
 	public $posts_per_page = 10;
 	public $max_results = 1000;
@@ -204,7 +203,6 @@ class GO_Sphinx
 		//TODO: add all filters here if we're going to remove them all
 		// after the query's over
 		$this->query_modified = FALSE;
-		$this->use_sphinx = TRUE;
 		$this->filter_args = array();
 		$this->search_stats = array();
 
@@ -266,104 +264,17 @@ class GO_Sphinx
 		return $request;
 	}
 
-	// returns TRUE if we want the query to be "split", which means
-	// WP will first get the result post ids, and then look up the
-	// corresponding objects. we want to split the query when we
-	// use sphinx for the search results
-	public function split_the_query( $split_the_query, $wp_query )
+	// check if we can use sphinx on this query or not
+	public function use_sphinx( $wp_query )
 	{
 		// cannot use sphinx if the query has been modified by another plugin
 		if ( $this->query_modified )
 		{
-			$this->use_sphinx = FALSE;
-			return $split_the_query;
+			return FALSE;
 		}
 
-		// check if we can use sphinx for this query or not
-		$this->use_sphinx = $this->is_supported_query( $wp_query );
-
-		if ( $this->use_sphinx )
-		{
-			return TRUE;
-		}
-
-		return $split_the_query;
-	}
-
-	// replace the request (SQL) to come up with search result post ids
-	public function posts_request_ids( $request, $wp_query )
-	{
-		if ( ! $this->use_sphinx )
-		{
-			return $request;
-		}
-
-		global $wpdb;
-
-		// return a SQL query that encodes the sphinx search results like
-		// SELECT ID from wp_posts
-		// WHERE ID IN ( 5324, 1231) ORDER BY FIELD( ID, 5324, 1231)
-		$t0 = microtime( TRUE );
-		$result_ids = $this->sphinx_query( $wp_query );
-
-		$this->search_stats['elapsed_time'] = round( microtime( TRUE ) - $t0, 6 );
-		// save the original request before overriding it.
-		$this->search_stats['wp_request'] = $request;
-
-		if ( is_wp_error( $result_ids ) )
-		{
-			$this->use_sphinx = FALSE;
-			return $request;
-		}
-
-		if ( isset( $_GET[ $this->qv_debug ] ) && current_user_can( 'edit_others_posts' ) )
-		{
-			wp_localize_script( 'go-sphinx-js', 'sphinx_results', (array) $this->search_stats );
-		}
-
-		if ( 0 < count( $result_ids ) )
-		{
-			$request = "SELECT ID FROM $wpdb->posts WHERE ID IN (" . implode( ',', $result_ids ) . ') ORDER BY FIELD ( ID, ' . implode( ',', $result_ids ) . ')';
-		}
-		else
-		{
-			// return a sql that returns nothing
-			$request = "SELECT ID FROM $wpdb->posts WHERE 1 = 0";
-		}
-
-		return $request;
-	}
-
-	// set the query to find out how many posts were found by the query.
-	// we replace the incoming query with a simple static sql query
- 	// since we'll set the found_posts # ourselves and don't want to
-	// make WP/mysql do any unnecessary additional work.
-	public function found_posts_query( $param )
-	{
-		if ( ! $this->use_sphinx )
-		{
-			return $param;
-		}
-
-		return 'SELECT 0';
-	}
-
-	// overrides the number of posts found. in search this affects
-	// pagination.
-	public function found_posts( $found_posts, $wp_query )
-	{
-		if ( $this->use_sphinx && $this->results )
-		{
-			$found_posts = $this->results['total_found'];
-		}
-
-		return $found_posts;
-	}
-
-	// parse $wp_query to determine if we can use sphinx for this
-	// search or not.
-	public function is_supported_query( $wp_query )
-	{
+		// parse $wp_query to determine if we can use sphinx for this
+		// search or not.
 		// check manual override first
 		if ( ( GO_Sphinx::SPHINX_OVERRIDE_OFF == $this->get_sphinx_override() ) && current_user_can( 'edit_others_posts' ) )
 		{
@@ -396,6 +307,85 @@ class GO_Sphinx
 		return TRUE;
 	}
 
+	// returns TRUE if we want the query to be "split", which means
+	// WP will first get the result post ids, and then look up the
+	// corresponding objects. we want to split the query when we
+	// use sphinx for the search results
+	public function split_the_query( $split_the_query, $wp_query )
+	{
+		return $this->use_sphinx( $wp_query ) ? TRUE : $split_the_query;
+	}
+
+	// replace the request (SQL) to come up with search result post ids
+	public function posts_request_ids( $request, $wp_query )
+	{
+		if ( ! $this->use_sphinx( $wp_query ) )
+		{
+			return $request;
+		}
+
+		global $wpdb;
+
+		// return a SQL query that encodes the sphinx search results like
+		// SELECT ID from wp_posts
+		// WHERE ID IN ( 5324, 1231) ORDER BY FIELD( ID, 5324, 1231)
+		$t0 = microtime( TRUE );
+		$result_ids = $this->sphinx_query( $wp_query );
+
+		$this->search_stats['elapsed_time'] = round( microtime( TRUE ) - $t0, 6 );
+		// save the original request before overriding it.
+		$this->search_stats['wp_request'] = $request;
+
+		if ( is_wp_error( $result_ids ) )
+		{
+			$this->search_stats['error'] = $result_ids;
+			return $request;
+		}
+
+		if ( isset( $_GET[ $this->qv_debug ] ) && current_user_can( 'edit_others_posts' ) )
+		{
+			wp_localize_script( 'go-sphinx-js', 'sphinx_results', (array) $this->search_stats );
+		}
+
+		if ( 0 < count( $result_ids ) )
+		{
+			$request = "SELECT ID FROM $wpdb->posts WHERE ID IN (" . implode( ',', $result_ids ) . ') ORDER BY FIELD ( ID, ' . implode( ',', $result_ids ) . ')';
+		}
+		else
+		{
+			// return a sql that returns nothing
+			$request = "SELECT ID FROM $wpdb->posts WHERE 1 = 0";
+		}
+
+		return $request;
+	}
+
+	// set the query to find out how many posts were found by the query.
+	// we replace the incoming query with a simple static sql query
+ 	// since we'll set the found_posts # ourselves and don't want to
+	// make WP/mysql do any unnecessary additional work.
+	public function found_posts_query( $param )
+	{
+		if ( empty( $this->search_stats ) || isset( $this->search_stats['error'] ) )
+		{
+			return $param;
+		}
+
+		return 'SELECT 0';
+	}
+
+	// overrides the number of posts found. in search this affects
+	// pagination.
+	public function found_posts( $found_posts, $wp_query )
+	{
+		if ( ! empty( $this->search_stats ) && ! isset( $this->search_stats['error'] ) && isset( $this->search_stats['sphinx_results'] ) )
+		{
+			$found_posts = $this->search_stats['sphinx_results']['total_found'];
+		}
+
+		return $found_posts;
+	}
+
 	// used for scriblio facets integration. this filter callback is
 	// invoked before scriblio facets tries to execute a sql query
 	// to get the query results. if we have scriblio results here then
@@ -407,16 +397,16 @@ class GO_Sphinx
 	//
 	public function scriblio_pre_get_matching_post_ids( $ignorable, $max )
 	{
-		if ( FALSE == $this->results )
+		if ( ! isset( $this->search_stats['sphinx_results'] ) || empty( $this->search_stats['sphinx_results'] ) )
 		{
 			return FALSE;
 		}
 
 		$num_added = 0;
 		$result_ids = array();
-		if ( isset( $this->results['matches'] ) )
+		if ( isset( $this->search_stats['sphinx_results']['matches'] ) )
 		{
-			foreach( $this->results['matches'] as $match )
+			foreach( $this->search_stats['sphinx_results']['matches'] as $match )
 			{
 				$result_ids[] = $match['id'];
 				$num_added ++;
@@ -482,17 +472,17 @@ class GO_Sphinx
 		$query_strs[] = $this->sphinx_query_post_status( $wp_query );
 
 		$client->SetMatchMode( SPH_MATCH_EXTENDED );
-		$this->results = $client->Query( implode( ' ', $query_strs ), $this->index_name );
+		$results = $client->Query( implode( ' ', $query_strs ), $this->index_name );
 
-		if ( FALSE == $this->results )
+		if ( FALSE == $results )
 		{
 			return new WP_Error( 'sphinx query error', $client->GetLastError() );
 		}
 
-		if ( isset( $this->results['matches'] ) )
+		if ( isset( $results['matches'] ) )
 		{
 			$num_results = 0;
-			foreach( $this->results['matches'] as $match )
+			foreach( $results['matches'] as $match )
 			{
 				$ids[] = $match['id'];
 
@@ -507,7 +497,7 @@ class GO_Sphinx
 			}
 		}
 
-		$this->search_stats['sphinx_results'] = $this->results;
+		$this->search_stats['sphinx_results'] = $results;
 
 		return $ids;
 	}
