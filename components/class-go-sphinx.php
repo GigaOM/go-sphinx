@@ -188,10 +188,10 @@ class GO_Sphinx
 		$this->add_tester_filters();
 
 		// filters to inject sphinx search results if applicable
-		add_filter( 'split_the_query', array( $this, 'split_the_query' ), 9999, 2 );
-		add_filter( 'posts_request_ids', array( $this, 'posts_request_ids' ), 9999, 2 );
-		add_filter( 'found_posts_query', array( $this, 'found_posts_query' ), 9999 );
-		add_filter( 'found_posts', array( $this, 'found_posts' ), 9999, 2 );
+		add_filter( 'split_the_query', array( $this, 'split_the_query' ), 101, 2 );
+		add_filter( 'posts_request_ids', array( $this, 'posts_request_ids' ), 101, 2 );
+		add_filter( 'found_posts_query', array( $this, 'found_posts_query' ), 101 );
+		add_filter( 'found_posts', array( $this, 'found_posts' ), 101, 2 );
 
 		// used for scriblio facets integration
 		add_filter( 'scriblio_pre_get_matching_post_ids', array( $this, 'scriblio_pre_get_matching_post_ids' ), 10, 2 );
@@ -218,7 +218,7 @@ class GO_Sphinx
 		foreach( $this->filters_to_watch as $filter )
 		{
 			add_filter( $filter, array( $this, 'check_query' ), 1 );
-			add_filter( $filter, array( $this, 'check_query' ), 9999 );
+			add_filter( $filter, array( $this, 'check_query' ), 101 );
 		}
 	}
 
