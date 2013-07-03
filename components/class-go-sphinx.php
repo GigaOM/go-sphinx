@@ -816,12 +816,7 @@ class GO_Sphinx
 			}
 			else
 			{
-				$author_ids = explode(',', $author);
-				$authors = array();
-				foreach ($author_ids as $v) 
-				{
-					$authors[] = (int) $v;
-				}
+				$authors = wp_parse_id_list( $author );
 				$client->SetFilter( 'post_author', $authors );
 			} // END IF check for NOT operator
 			
