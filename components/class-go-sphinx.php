@@ -92,7 +92,7 @@ class GO_Sphinx
 		add_action( 'init' , array( $this, 'init' ) , 10 );
 
 		global $wpdb;
-		$this->index_name = $wpdb->posts;
+		$this->index_name = $wpdb->posts . ',' . $wpdb->posts . '_delta';
 
 		// the admin settings page
 		if ( is_admin() )
