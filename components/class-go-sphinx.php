@@ -15,6 +15,7 @@ class GO_Sphinx
 	public $search_stats = array();
 	public $posts_per_page = 10;
 	public $max_results = 1000;
+	public $secondary_index_postfix = '_delta';
 	public $admin_cap = 'manage_options';
 	public $qv_debug = 'go-sphinx-debug';
 	public $qv_use_sphinx = 'go-sphinx-use';
@@ -92,7 +93,7 @@ class GO_Sphinx
 		add_action( 'init' , array( $this, 'init' ) , 10 );
 
 		global $wpdb;
-		$this->index_name = $wpdb->posts . ',' . $wpdb->posts . '_delta';
+		$this->index_name = $wpdb->posts . ',' . $wpdb->posts . $this->secondary_index_postfix;
 
 		// the admin settings page
 		if ( is_admin() )

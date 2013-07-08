@@ -32,7 +32,8 @@ source <?php echo $c->name; ?>
 		FROM <?php echo $c->posts_table; ?> p \
 		LEFT JOIN <?php echo $c->search_table; ?> s ON p.ID = s.post_id \
 		LEFT JOIN <?php echo $c->term_relationships_table; ?> tr ON p.ID = tr.object_id \
-		WHERE ID >= $start AND ID <= $end \
+		WHERE ID >= $start AND \
+			ID <= $end \
 		GROUP BY p.ID
 
 	sql_attr_timestamp  = post_date_gmt
@@ -60,7 +61,7 @@ index <?php echo $c->name; ?>
 }
 
 
-source <?php echo $c->name . '_delta'; ?>
+source <?php echo $c->secondary_index; ?>
 
 {
 	type            = mysql
@@ -94,7 +95,9 @@ source <?php echo $c->name . '_delta'; ?>
 		FROM <?php echo $c->posts_table; ?> p \
 		LEFT JOIN <?php echo $c->search_table; ?> s ON p.ID = s.post_id \
 		LEFT JOIN <?php echo $c->term_relationships_table; ?> tr ON p.ID = tr.object_id \
-		WHERE ID >= $start AND ID <= $end AND DATE( p.post_modified ) = CURDATE() \
+		WHERE ID >= $start \
+			AND ID <= $end \
+			AND DATE( p.post_modified ) = CURDATE() \
 		GROUP BY p.ID
 
 	sql_attr_timestamp  = post_date_gmt
@@ -110,12 +113,12 @@ source <?php echo $c->name . '_delta'; ?>
 }
 
 
-index <?php echo $c->name . '_delta'; ?>
+index <?php echo $c->secondary_index; ?>
 
 {
-	source          = <?php echo $c->name . '_delta'; ?>
+	source          = <?php echo $c->secondary_index; ?>
 
-	path            = /var/lib/sphinx/<?php echo $c->name . '_delta'; ?>
+	path            = /var/lib/sphinx/<?php echo $c->secondary_index; ?>
 
 	docinfo         = extern
 	charset_type    = utf-8
