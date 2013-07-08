@@ -25,7 +25,11 @@ class GO_Sphinx_Admin extends GO_Sphinx
 
 	public function plugin_action_links( $actions )
 	{
-		$actions[] = '<a href="' . admin_url( 'options-general.php?page=go-sphinx' ) . '">'. __( 'Settings' ) .'</a>';
+		$url = '<a href="' . admin_url( 'options-general.php?page=go-sphinx' ) . '">'. __( 'Settings' ) .'</a>';
+		if ( ! in_array( $url, $actions ) )
+		{
+			$actions[] = $url;
+		}
 		return $actions;
 	}
 
@@ -48,6 +52,8 @@ class GO_Sphinx_Admin extends GO_Sphinx
 			'posts_table' => $wpdb->posts,
 			'term_relationships_table' => $wpdb->term_relationships,
 			'search_table' => bcms_search()->search_table,
+
+			'secondary_index' => $wpdb->posts . $this->secondary_index_postfix,
 		);
 
 		require __DIR__ . '/templates/config-page.php';
