@@ -8,20 +8,22 @@
 	<h3>Command-line helpers</h3>
 	<ol>
 		<li>
-			<p>Do the initial index</p>
+			<p>Build the initial indexes</p>
+			<p><code>sudo -u sphinx indexer <?php echo $c->name . '_delta'; ?></code></p>
 			<p><code>sudo -u sphinx indexer <?php echo $c->name; ?></code></p>
 			<p>(Note that there's no <code>--rotate</code> flag.)</p>
 		</li>
 
 		<li>
 			<p>Update an existing index</p>
+			<p><code>sudo -u sphinx indexer <?php echo $c->name . '_delta'; ?></code></p>
 			<p><code>sudo -u sphinx indexer --rotate <?php echo $c->name; ?></code></p>
 			<p><a href="http://sphinxsearch.com/docs/current.html#ref-indexer">Here are the complete docs on <code>indexer</code></a></p>
 		</li>
 
 		<li>
 			<p>Do a search</p>
-			<p><code>sudo -u sphinx search -i <?php echo $c->name; ?> -q SEARCHTERM</code></p>
+			<p><code>sudo -u sphinx search -i <?php echo $c->name; ?>,<?php echo $c->name . '_delta'; ?> -q SEARCHTERM</code></p>
 			<p><a href="http://sphinxsearch.com/docs/current.html#ref-search">Here are the complete docs on <code>search</code></a></p>
 		</li>
 	</ol>
