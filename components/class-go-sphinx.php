@@ -43,6 +43,7 @@ class GO_Sphinx
 	);
 	public $supported_query_vars = array(
 		'author',
+		'authors',
 		'author_name',
 		'category__in',
 		'category__not_in',
@@ -707,7 +708,7 @@ class GO_Sphinx
 		}
 		elseif ( isset( $wp_query->query['paged'] ) && ( 0 < $wp_query->query['paged'] ) )
 		{
-			$offset = ($wp_query->query['paged'] - 1 ) * $posts_per_page;
+			$offset = ($wp_query->query['paged'] - 1 ) * $this->posts_per_page;
 		}
 
 		$client->SetLimits( $offset, $this->max_results, $this->max_results );
