@@ -354,11 +354,6 @@ class GO_Sphinx
 			$this->search_stats['posts_sphinx'] = $result_ids;
 			$this->search_stats['posts_equality'] = ( $this->search_stats['posts_mysql'] == $this->search_stats['posts_sphinx'] );
 
-
-echo '<pre>';
-//print_r( $this->search_stats );
-echo '</pre>';
-
 			wp_localize_script( 'go-sphinx-js', 'sphinx_results', (array) $this->search_stats );
 		}
 
@@ -471,6 +466,7 @@ echo '</pre>';
 
 		$query_strs[] = $this->sphinx_query_post_status( $wp_query );
 
+		$client->SetRankingMode( SPH_RANK_PROXIMITY_BM25 );
 		$client->SetMatchMode( SPH_MATCH_EXTENDED );
 		$results = $client->Query( implode( ' ', $query_strs ), $this->index_name );
 
@@ -558,6 +554,11 @@ echo '</pre>';
 	 */
 	public function sphinx_query_taxonomy( &$client, $wp_query )
 	{
+		if ( ! is_array( $wp_query->tax_query->queries ) || empty( $wp_query->tax_query->queries ) )
+		{
+			return FALSE;
+		}
+
 		if ( 'AND' == $wp_query->tax_query->relation )
 		{
 			foreach( $wp_query->tax_query->queries as $query )
@@ -710,7 +711,7 @@ echo '</pre>';
 			return '';
 		}
 
-		return '@post_content ' . $wp_query->query['s'];
+		return '@(post_content,content) ' . $wp_query->query['s'];
 	}
 
 	/**
