@@ -8,7 +8,7 @@ class GO_Sphinx
 	public $admin  = FALSE;
 	public $client = FALSE;
 	public $test   = FALSE;
-	public $version = 1;
+	public $version = 2;
 	public $index_name = FALSE;
 	public $filter_args = array();
 	public $query_modified = FALSE; // did another plugin modify the current query?
@@ -154,14 +154,12 @@ class GO_Sphinx
 				'server'      => 'localhost',
 				'port'        => 9312,
 				'timeout'     => 1,
-				'arrayresult' => TRUE,
 			), 'go-sphinx' ) );
 
 			$this->client->SetServer( $config['server'], $config['port'] );
 			$this->client->SetConnectTimeout( $config['timeout'] );
-			$this->client->SetArrayResult( $config['arrayresult'] );
+			$this->client->SetArrayResult( FALSE ); // other methods depend on the result array key being the post_id
 		}
-		// TODO: else set up the client with info from $config
 
 		return $this->client;
 	}
@@ -352,6 +350,10 @@ class GO_Sphinx
 
 		if ( $this->is_debug() )
 		{
+			$this->search_stats['posts_mysql'] = $wpdb->get_col( $request );
+			$this->search_stats['posts_sphinx'] = $result_ids;
+			$this->search_stats['posts_equality'] = ( $this->search_stats['posts_mysql'] == $this->search_stats['posts_sphinx'] );
+
 			wp_localize_script( 'go-sphinx-js', 'sphinx_results', (array) $this->search_stats );
 		}
 
@@ -382,8 +384,7 @@ class GO_Sphinx
 		return 'SELECT 0';
 	}
 
-	// overrides the number of posts found. in search this affects
-	// pagination.
+	// overrides the number of posts found, this affects pagination.
 	public function found_posts( $found_posts, $wp_query )
 	{
 		if ( ! empty( $this->search_stats ) && ! isset( $this->search_stats['error'] ) && isset( $this->search_stats['sphinx_results'] ) )
@@ -405,26 +406,12 @@ class GO_Sphinx
 	//
 	public function scriblio_pre_get_matching_post_ids( $ignorable, $max )
 	{
-		if ( ! isset( $this->search_stats['sphinx_results'] ) || empty( $this->search_stats['sphinx_results'] ) )
+		if ( ! isset( $this->matched_posts ) || empty( $this->matched_posts ) )
 		{
 			return FALSE;
 		}
 
-		$num_added = 0;
-		$result_ids = array();
-		if ( isset( $this->search_stats['sphinx_results']['matches'] ) )
-		{
-			foreach( $this->search_stats['sphinx_results']['matches'] as $match )
-			{
-				$result_ids[] = $match['id'];
-				$num_added ++;
-				if ( $num_added >= $max )
-				{
-					break;
-				}
-			}
-		}
-		return $result_ids;
+		return $this->matched_posts;
 	}
 
 	// perform a sphinx query that's equivalent to the $wp_query
@@ -440,7 +427,7 @@ class GO_Sphinx
 		if ( is_wp_error( $res = $this->sphinx_query_author( $client, $wp_query ) ) )
 		{
 			return $res;
-		}		
+		}
 
 		// order and orderby
 		if ( is_wp_error( $res = $this->sphinx_query_ordering( $client, $wp_query ) ) )
@@ -479,6 +466,7 @@ class GO_Sphinx
 
 		$query_strs[] = $this->sphinx_query_post_status( $wp_query );
 
+		$client->SetRankingMode( SPH_RANK_PROXIMITY_BM25 );
 		$client->SetMatchMode( SPH_MATCH_EXTENDED );
 		$results = $client->Query( implode( ' ', $query_strs ), $this->index_name );
 
@@ -489,25 +477,15 @@ class GO_Sphinx
 
 		if ( isset( $results['matches'] ) )
 		{
-			$num_results = 0;
-			foreach( $results['matches'] as $match )
-			{
-				$ids[] = $match['id'];
-
-				// implement our own result set sizing here, since we
-				// had saved $this->max_results in case we need more than
-				// what the current request asks for
-				$num_results ++;
-				if ( $this->posts_per_page <= $num_results )
-				{
-					break;
-				}
-			}
+			$this->matched_posts = array_keys( $results['matches'] );
 		}
 
-		$this->search_stats['sphinx_results'] = $results;
+		if ( $this->is_debug() )
+		{
+			$this->search_stats['sphinx_results'] = $results;
+		}
 
-		return $ids;
+		return array_slice( $this->matched_posts , 0, $this->posts_per_page );
 	}
 
 	/**
@@ -576,6 +554,11 @@ class GO_Sphinx
 	 */
 	public function sphinx_query_taxonomy( &$client, $wp_query )
 	{
+		if ( ! is_array( $wp_query->tax_query->queries ) || empty( $wp_query->tax_query->queries ) )
+		{
+			return FALSE;
+		}
+
 		if ( 'AND' == $wp_query->tax_query->relation )
 		{
 			foreach( $wp_query->tax_query->queries as $query )
@@ -584,7 +567,7 @@ class GO_Sphinx
 				$wp_query->tax_query->transform_query( $query, 'term_taxonomy_id' );
 				if ( empty( $query['terms'] ) )
 				{
-					// if a tax query has no term then it means some or all 
+					// if a tax query has no term then it means some or all
 					// of the terms could not be resolved. in this case we
 					// set a filter that'll block all results to ensure
 					// the final query result will be empty
@@ -728,7 +711,7 @@ class GO_Sphinx
 			return '';
 		}
 
-		return '@post_content ' . $wp_query->query['s'];
+		return '@(post_content,content) ' . $wp_query->query['s'];
 	}
 
 	/**
@@ -788,15 +771,15 @@ class GO_Sphinx
 		}
 		return $query_str;
 	}//END sphinx_query_post_type
-	
-	
+
+
 	/**
 	 * parse author param in $wp_query and set the appropriate
 	 * flags in the sphinx client $client.
-	 * 
+	 *
 	 * author param could be one of:
-	 *  1) not set 
-	 *  2) single neg 
+	 *  1) not set
+	 *  2) single neg
 	 *  3) list of 1 or more pos ints
 	 *
 	 * @retval TRUE in all cases...
@@ -809,8 +792,8 @@ class GO_Sphinx
 			$author = $wp_query->query['author'];
 			// check for existence of NOT operator ("-"):
 			$exclude_position = strpos( $author, '-' );
-			
-			if ( $exclude_position !== false ) 
+
+			if ( $exclude_position !== false )
 			{
 				// remove from found position
 				$author_id = substr( $author, $exclude_position + 1 );
@@ -821,11 +804,11 @@ class GO_Sphinx
 				$authors = wp_parse_id_list( $author );
 				$client->SetFilter( 'post_author', $authors );
 			} // END IF check for NOT operator
-			
+
 		} // END IF check for author param
-		
+
 		return TRUE;
-	}//END sphinx_query_author	
+	}//END sphinx_query_author
 
 	// find all taxonomies in wp_query's tax_query array and return them
 	// in an array
@@ -835,7 +818,7 @@ class GO_Sphinx
 
 		foreach( $wp_query->tax_query->queries as $tax_query )
 		{
-			$taxonomies[] = $tax_query['taxonomy'];	
+			$taxonomies[] = $tax_query['taxonomy'];
 		}
 		return $taxonomies;
 	}
@@ -853,6 +836,6 @@ function go_sphinx()
 	{
 		$go_sphinx = new GO_Sphinx();
 	}//end if
-	
+
 	return $go_sphinx;
 }//end go_sphinx
