@@ -76,7 +76,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 			++$num_failed;
 		}
 		++$this->test_count;
-		
+
 		echo "$this->test_count.\n";
 		if ( ! $this->most_recent_by_term_name_test() )
 		{
@@ -341,7 +341,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 	/**
 	 * "5. Repeat the query from #4, but change the posts_per_page value to
 	 *  3 and paged to 3. The query should return up to 3 posts starting
-	 *  with the last post returned in #4; the MySQL and Sphinx results 
+	 *  with the last post returned in #4; the MySQL and Sphinx results
 	 *  should be indistinguishable."
 	 *
 	 * query_var: tax_query, paged
@@ -431,18 +431,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 
 	public function extract_sphinx_matches_ids( $sp_results )
 	{
-		$ids = array();
-		if ( ! isset( $sp_results['matches'] ) )
-		{
-			return $ids;
-		}
-
-		foreach( $sp_results['matches'] as $match )
-		{
-			$ids[] = $match['id'];
-		}
-
-		return $ids;
+		return array_keys( $sp_results['matches'] );
 	}//END extract_sphinx_matches_ids
 
 	/**
@@ -694,7 +683,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 		$post_ids_to_ttids = array(); // maps post ids to ttid lists
 		$ttids_to_terms = array();    // maps ttids to term objects
 
-		foreach ( $post_ids_to_terms as $post_id => $terms_list ) 
+		foreach ( $post_ids_to_terms as $post_id => $terms_list )
 		{
 			$ttids = array();
 			foreach ($terms_list as $term_obj)
@@ -723,7 +712,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 					}
 				}
 			}
-			if ( 2 <= count( $query_terms ) ) 
+			if ( 2 <= count( $query_terms ) )
 			{
 				break;
 			}
@@ -737,7 +726,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 	 * @param $is_IN_test whether to use the "IN" (OR) test or not.
 	 * @retval TRUE if the test passed.
 	 * @retval FALSE if the test failed or if we encountered an error.
-	 */		
+	 */
 	public function WP_mutually_exclusive_posts_test( $query_terms, $is_IN_test )
 	{
 		$tax_query = $is_IN_test ? array( 'relation' => 'OR' ) : array( 'relation' => 'AND' );
@@ -784,7 +773,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 
 	public function is_ttid_in_array($post_ids, $post_to_ignore, $ttid)
 	{
-		foreach ( $post_ids as $post_id => $ttid_list ) 
+		foreach ( $post_ids as $post_id => $ttid_list )
 		{
 			if ( $post_id == $post_to_ignore ) continue;
 			if ( in_array($ttid, $ttid_list) )
@@ -792,16 +781,16 @@ class GO_Sphinx_Test extends GO_Sphinx
 				return TRUE;
 			}
 		}
-		
+
 		return FALSE;
 	} // END is_ttid_in_array
-	
+
 	/**
 	 * @param $query_terms array of post id mapped to term objects to search
 	 * @param $is_IN_test whether to use the "IN" (OR) test or not.
 	 * @retval TRUE if the test passed.
 	 * @retval FALSE if the test failed or if we encountered an error.
-	 */		
+	 */
 	public function SP_mutually_exclusive_posts_test( $query_terms, $is_IN_test )
 	{
 		$this->client = FALSE; // ensure we get a new instance
@@ -880,7 +869,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 		echo "---\n\n";
 		return $res;
 	}//END mutually_exclusive_posts_IN_test
-	
+
 	/**
 	 * "8. Using the term from #1, do a new query using the term name as the
 	 *  keyword search string. The MySQL and Sphinx results should be
@@ -987,7 +976,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 		echo "---\n\n";
 
 		return $res;
-	}//END author_id_test	
+	}//END author_id_test
 
 	// @param $author_ids
 	public function wp_query_all_author_posts( $author_ids, $exclude = FALSE )
@@ -1034,7 +1023,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 			return FALSE;
 		}
 	}//END wp_query_all_author_posts
-	
+
 	public function sphinx_query_all_author_posts( $author_ids, $exclude = FALSE )
 	{
 		echo 'Sphinx query of all results for author(s) (' . implode( ', ', $author_ids ) . "):\n\n";
@@ -1047,7 +1036,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 		$client->SetFilter( 'post_author', $author_ids, $exclude );
 
 		$results = $client->Query( '@post_status publish', $this->index_name );
-		
+
 		if ( FALSE !== $results )
 		{
 			$ids = $this->extract_sphinx_matches_ids( $results );
@@ -1185,7 +1174,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 			echo "no posts found \n\n";
 			return FALSE;
 		}
-		
+
 		$id_to_test = $posts[2]->ID;
 
 		$wpq_results = new WP_Query(
@@ -1235,7 +1224,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 			echo "\n---\n\n";
 			return FALSE;
 		}
-		
+
 		if ( 1 > count( $spx_results['matches'] ) )
 		{
 			echo "did not find expected number of Sphinx results (1). FAILED\n\n";
@@ -1260,7 +1249,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 	}//END post_in_single_test
 
 	/**
-	 * "12. Repeat the query from #6, but include the post IDs from #7 as 
+	 * "12. Repeat the query from #6, but include the post IDs from #7 as
 	 * a post__in argument.
 	 * "The results of this query should be the same as #6, with neither of
 	 * the exemplar posts used to generate #6 returned."
@@ -1388,7 +1377,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 		echo "---\n\n";
 
 		return $res;
-	}//END author_ids_test	
+	}//END author_ids_test
 
 	/**
 	 * 14. Using an author ID from #1, do a new query for all results not
@@ -1421,7 +1410,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 		echo "---\n\n";
 
 		return $res;
-	}//END not_author_id_test	
+	}//END not_author_id_test
 
 	/**
 	 * 15. Pick the 3rd most popular category, or the most popular one if
@@ -1919,7 +1908,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 			echo "\n-\n\n";
 		}//END foreach
 
-		
+
 		return ( ! $failed );
 	}//END ordering_tests
 
