@@ -376,7 +376,7 @@ class GO_Sphinx
 	// make WP/mysql do any unnecessary additional work.
 	public function found_posts_query( $param )
 	{
-		if ( empty( $this->search_stats ) || isset( $this->search_stats['error'] ) )
+		if ( ! isset( $this->total_found ) || ! $this->total_found )
 		{
 			return $param;
 		}
@@ -387,9 +387,9 @@ class GO_Sphinx
 	// overrides the number of posts found, this affects pagination.
 	public function found_posts( $found_posts, $wp_query )
 	{
-		if ( ! empty( $this->search_stats ) && ! isset( $this->search_stats['error'] ) && isset( $this->search_stats['sphinx_results'] ) )
+		if ( isset( $this->total_found ) && $this->total_found )
 		{
-			$found_posts = $this->search_stats['sphinx_results']['total_found'];
+			$found_posts = $this->total_found;
 		}
 
 		return $found_posts;
@@ -478,6 +478,7 @@ class GO_Sphinx
 		if ( isset( $results['matches'] ) )
 		{
 			$this->matched_posts = array_keys( $results['matches'] );
+			$this->total_found = $results['total_found'];
 		}
 
 		if ( $this->is_debug() )
