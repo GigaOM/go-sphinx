@@ -8,7 +8,7 @@ class GO_Sphinx
 	public $admin  = FALSE;
 	public $client = FALSE;
 	public $test   = FALSE;
-	public $version = 8;
+	public $version = 2;
 	public $index_name = FALSE;
 	public $filter_args = array();
 	public $query_modified = FALSE; // did another plugin modify the current query?
