@@ -23,7 +23,7 @@ if (null != top_div){
 		else {
 			var sphinx_equality = document.createTextNode( 'Sphinx and MySQL DO NOT MATCH' );
 		}
-		sphinx_equality_div.appendChild(sphinx_equality);	
+		sphinx_equality_div.appendChild(sphinx_equality);
 
 		// insert the original wp_query before top_div
 		var wp_query_div = document.createElement('p');
@@ -35,10 +35,10 @@ if (null != top_div){
 			var br = document.createElement('br');
 
 			searcheditor.parentNode.insertBefore( wp_query_div, searcheditor );
-			searcheditor.parentNode.insertBefore( br, searcheditor );			
+			searcheditor.parentNode.insertBefore( br, searcheditor );
 
 			searcheditor.parentNode.insertBefore( sphinx_equality_div, searcheditor );
-			searcheditor.parentNode.insertBefore( br, searcheditor );			
+			searcheditor.parentNode.insertBefore( br, searcheditor );
 		}
 		console.log(sphinx_results);
 	}

@@ -432,7 +432,7 @@ echo '</pre>';
 		if ( is_wp_error( $res = $this->sphinx_query_author( $client, $wp_query ) ) )
 		{
 			return $res;
-		}		
+		}
 
 		// order and orderby
 		if ( is_wp_error( $res = $this->sphinx_query_ordering( $client, $wp_query ) ) )
@@ -566,7 +566,7 @@ echo '</pre>';
 				$wp_query->tax_query->transform_query( $query, 'term_taxonomy_id' );
 				if ( empty( $query['terms'] ) )
 				{
-					// if a tax query has no term then it means some or all 
+					// if a tax query has no term then it means some or all
 					// of the terms could not be resolved. in this case we
 					// set a filter that'll block all results to ensure
 					// the final query result will be empty
@@ -770,15 +770,15 @@ echo '</pre>';
 		}
 		return $query_str;
 	}//END sphinx_query_post_type
-	
-	
+
+
 	/**
 	 * parse author param in $wp_query and set the appropriate
 	 * flags in the sphinx client $client.
-	 * 
+	 *
 	 * author param could be one of:
-	 *  1) not set 
-	 *  2) single neg 
+	 *  1) not set
+	 *  2) single neg
 	 *  3) list of 1 or more pos ints
 	 *
 	 * @retval TRUE in all cases...
@@ -791,8 +791,8 @@ echo '</pre>';
 			$author = $wp_query->query['author'];
 			// check for existence of NOT operator ("-"):
 			$exclude_position = strpos( $author, '-' );
-			
-			if ( $exclude_position !== false ) 
+
+			if ( $exclude_position !== false )
 			{
 				// remove from found position
 				$author_id = substr( $author, $exclude_position + 1 );
@@ -803,11 +803,11 @@ echo '</pre>';
 				$authors = wp_parse_id_list( $author );
 				$client->SetFilter( 'post_author', $authors );
 			} // END IF check for NOT operator
-			
+
 		} // END IF check for author param
-		
+
 		return TRUE;
-	}//END sphinx_query_author	
+	}//END sphinx_query_author
 
 	// find all taxonomies in wp_query's tax_query array and return them
 	// in an array
@@ -817,7 +817,7 @@ echo '</pre>';
 
 		foreach( $wp_query->tax_query->queries as $tax_query )
 		{
-			$taxonomies[] = $tax_query['taxonomy'];	
+			$taxonomies[] = $tax_query['taxonomy'];
 		}
 		return $taxonomies;
 	}
@@ -835,6 +835,6 @@ function go_sphinx()
 	{
 		$go_sphinx = new GO_Sphinx();
 	}//end if
-	
+
 	return $go_sphinx;
 }//end go_sphinx
