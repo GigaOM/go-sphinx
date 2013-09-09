@@ -8,7 +8,7 @@ class GO_Sphinx
 	public $admin  = FALSE;
 	public $client = FALSE;
 	public $test   = FALSE;
-	public $version = 1;
+	public $version = 8;
 	public $index_name = FALSE;
 	public $filter_args = array();
 	public $query_modified = FALSE; // did another plugin modify the current query?
@@ -154,14 +154,12 @@ class GO_Sphinx
 				'server'      => 'localhost',
 				'port'        => 9312,
 				'timeout'     => 1,
-				'arrayresult' => TRUE,
 			), 'go-sphinx' ) );
 
 			$this->client->SetServer( $config['server'], $config['port'] );
 			$this->client->SetConnectTimeout( $config['timeout'] );
-			$this->client->SetArrayResult( $config['arrayresult'] );
+			$this->client->SetArrayResult( FALSE ); // other methods depend on the result array key being the post_id
 		}
-		// TODO: else set up the client with info from $config
 
 		return $this->client;
 	}
@@ -352,6 +350,15 @@ class GO_Sphinx
 
 		if ( $this->is_debug() )
 		{
+			$this->search_stats['posts_mysql'] = $wpdb->get_col( $request );
+			$this->search_stats['posts_sphinx'] = $result_ids;
+			$this->search_stats['posts_equality'] = ( $this->search_stats['posts_mysql'] == $this->search_stats['posts_sphinx'] );
+
+
+echo '<pre>';
+//print_r( $this->search_stats );
+echo '</pre>';
+
 			wp_localize_script( 'go-sphinx-js', 'sphinx_results', (array) $this->search_stats );
 		}
 
@@ -382,8 +389,7 @@ class GO_Sphinx
 		return 'SELECT 0';
 	}
 
-	// overrides the number of posts found. in search this affects
-	// pagination.
+	// overrides the number of posts found, this affects pagination.
 	public function found_posts( $found_posts, $wp_query )
 	{
 		if ( ! empty( $this->search_stats ) && ! isset( $this->search_stats['error'] ) && isset( $this->search_stats['sphinx_results'] ) )
@@ -405,26 +411,12 @@ class GO_Sphinx
 	//
 	public function scriblio_pre_get_matching_post_ids( $ignorable, $max )
 	{
-		if ( ! isset( $this->search_stats['sphinx_results'] ) || empty( $this->search_stats['sphinx_results'] ) )
+		if ( ! isset( $this->matched_posts ) || empty( $this->matched_posts ) )
 		{
 			return FALSE;
 		}
 
-		$num_added = 0;
-		$result_ids = array();
-		if ( isset( $this->search_stats['sphinx_results']['matches'] ) )
-		{
-			foreach( $this->search_stats['sphinx_results']['matches'] as $match )
-			{
-				$result_ids[] = $match['id'];
-				$num_added ++;
-				if ( $num_added >= $max )
-				{
-					break;
-				}
-			}
-		}
-		return $result_ids;
+		return $this->matched_posts;
 	}
 
 	// perform a sphinx query that's equivalent to the $wp_query
@@ -489,25 +481,15 @@ class GO_Sphinx
 
 		if ( isset( $results['matches'] ) )
 		{
-			$num_results = 0;
-			foreach( $results['matches'] as $match )
-			{
-				$ids[] = $match['id'];
-
-				// implement our own result set sizing here, since we
-				// had saved $this->max_results in case we need more than
-				// what the current request asks for
-				$num_results ++;
-				if ( $this->posts_per_page <= $num_results )
-				{
-					break;
-				}
-			}
+			$this->matched_posts = array_keys( $results['matches'] );
 		}
 
-		$this->search_stats['sphinx_results'] = $results;
+		if ( $this->is_debug() )
+		{
+			$this->search_stats['sphinx_results'] = $results;
+		}
 
-		return $ids;
+		return array_slice( $this->matched_posts , 0, $this->posts_per_page );
 	}
 
 	/**
