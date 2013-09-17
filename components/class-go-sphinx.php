@@ -788,25 +788,40 @@ class GO_Sphinx
 	 */
 	public function sphinx_query_author( &$client, $wp_query )
 	{
-		if ( isset( $wp_query->query['author'] ) )
+		if ( isset( $wp_query->query['author'] ) || isset( $wp_query->query['author_name'] ) )
 		{
-			$author = $wp_query->query['author'];
-			// check for existence of NOT operator ("-"):
-			$exclude_position = strpos( $author, '-' );
-
-			if ( $exclude_position !== false )
+			$author_id = NULL;
+			if ( isset( $wp_query->query['author'] ) )
 			{
-				// remove from found position
-				$author_id = substr( $author, $exclude_position + 1 );
-				$client->SetFilter( 'post_author', array( (int) $author_id ), TRUE );
+				$author_id = $wp_query->query['author'];
+				// check for existence of NOT operator ("-"):
+				$exclude_position = strpos( $author_id, '-' );
+				if ( FALSE !== $exclude_position )
+				{
+					$author_id = substr( $author_id, $exclude_position + 1 );
+				}
 			}
 			else
 			{
-				$authors = wp_parse_id_list( $author );
-				$client->SetFilter( 'post_author', $authors );
-			} // END IF check for NOT operator
+				// get an author id from author_nicename if necessary
+				$author_name = $wp_query->query['author_name'];
+				$exclude_position = strpos( $author_name , '-' );
+				if ( FALSE !== $exclude_position )
+				{
+					$author_name = substr( $author_name, $exclude_position + 1 );
+				}
+				$user = get_user_by( 'slug', $author_name );
+				if ( FALSE !== $user )
+				{
+					$author_id = $user->ID;
+				}
+			}
 
-		} // END IF check for author param
+			if ( $author_id )
+			{
+				$client->SetFilter( 'post_author', array( (int) $author_id ), FALSE !== $exclude_position );
+			}
+		} // END if
 
 		return TRUE;
 	}//END sphinx_query_author
