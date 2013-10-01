@@ -572,7 +572,7 @@ class GO_Sphinx
 					// of the terms could not be resolved. in this case we
 					// set a filter that'll block all results to ensure
 					// the final query result will be empty
-					// see https://github.com/GigaOM/legacy-pro/issues/673
+					// see https://github.com/Gigaom/legacy-pro/issues/673
 					$client->SetFilter( 'tt_id', array( -1 ) );
 					break;
 				}

@@ -1,6 +1,6 @@
 <div class="wrap">
 	<?php screen_icon( 'tools' ); ?>
-	<h2>GigaOM Sphinx Integration</h2>
+	<h2>Gigaom Sphinx Integration</h2>
 
 	<h3>Sample config file with connection parameters</h3>
 	<textarea style="width:100%; height:200px;font-family:monospace;"><?php require __DIR__ . '/config-file.php'; ?></textarea>
