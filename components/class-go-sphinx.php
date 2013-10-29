@@ -717,9 +717,7 @@ class GO_Sphinx
 		// the query string so sphinx sees the original query. (not using
 		// wp_kses() here because the query string is not going to be
 		// consumed by a browser.)
-		$wp_query->query['s'] = trim( urldecode( stripslashes( $wp_query->query['s'] ) ) );
-
-		return '@(post_content,content) ' . $wp_query->query['s'];
+		return '@(post_content,content) ' . trim( urldecode( stripslashes( $wp_query->query['s'] ) ) );
 	}
 
 	/**
