@@ -713,7 +713,11 @@ class GO_Sphinx
 			return '';
 		}
 
-		return '@(post_content,content) ' . $wp_query->query['s'];
+		// strip out escaping backslashes added by WP, urldecode/trim
+		// the query string so sphinx sees the original query. (not using
+		// wp_kses() here because the query string is not going to be
+		// consumed by a browser.)
+		return '@(post_content,content) ' . trim( urldecode( stripslashes( $wp_query->query['s'] ) ) );
 	}
 
 	/**
