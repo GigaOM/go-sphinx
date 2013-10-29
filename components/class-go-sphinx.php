@@ -475,17 +475,18 @@ class GO_Sphinx
 			return new WP_Error( 'sphinx query error', $client->GetLastError() );
 		}
 
-		if ( isset( $results['matches'] ) )
-		{
-			$this->matched_posts = array_keys( $results['matches'] );
-			$this->total_found = $results['total_found'];
-		}
-
 		if ( $this->is_debug() )
 		{
 			$this->search_stats['sphinx_results'] = $results;
 		}
 
+		if ( ! isset( $results['matches'] ) )
+		{
+			return array();
+		}
+
+		$this->matched_posts = array_keys( $results['matches'] );
+		$this->total_found = $results['total_found'];
 		return array_slice( $this->matched_posts , 0, $this->posts_per_page );
 	}
 
