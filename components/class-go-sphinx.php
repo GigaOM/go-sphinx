@@ -457,7 +457,6 @@ class GO_Sphinx
 		$this->sphinx_query_pagination( $client, $wp_query );
 
 		// these quyery vars are implemented as sphinx query string
-
 		$query_strs = array();
 
 		$query_strs[] = $this->sphinx_query_keyword( $wp_query );
@@ -468,6 +467,7 @@ class GO_Sphinx
 
 		$client->SetRankingMode( SPH_RANK_PROXIMITY_BM25 );
 		$client->SetMatchMode( SPH_MATCH_EXTENDED );
+
 		$results = $client->Query( implode( ' ', $query_strs ), $this->index_name );
 
 		if ( FALSE == $results )
@@ -795,37 +795,44 @@ class GO_Sphinx
 	{
 		if ( isset( $wp_query->query['author'] ) || isset( $wp_query->query['author_name'] ) )
 		{
-			$author_id = NULL;
+			$author_id = -1;    // default must be an invalid author id
+			$exclusion = FALSE; // is this an exclusion search?
+
 			if ( isset( $wp_query->query['author'] ) )
 			{
-				$author_id = $wp_query->query['author'];
-				// check for existence of NOT operator ("-"):
-				$exclude_position = strpos( $author_id, '-' );
-				if ( FALSE !== $exclude_position )
+				// we expect this to be an author id
+				if ( is_numeric( $wp_query->query['author'] ) )
 				{
-					$author_id = substr( $author_id, $exclude_position + 1 );
-				}
-			}
+					$author_id = (int) $wp_query->query['author'];
+
+					// check for existence of NOT operator ("-"):
+					if ( ( 0 > $author_id ) && ( -1 != $author_id ) )
+					{
+						$exclusion = TRUE;
+						$author_id = abs( $author_id );
+					}
+				}//END if
+			}//END if
 			else
 			{
-				// get an author id from author_nicename if necessary
+				// get an author id from author name
 				$author_name = $wp_query->query['author_name'];
+
 				$exclude_position = strpos( $author_name , '-' );
 				if ( FALSE !== $exclude_position )
-				{
+				{ 
 					$author_name = substr( $author_name, $exclude_position + 1 );
+					$exclusion = TRUE;
 				}
+
 				$user = get_user_by( 'slug', $author_name );
 				if ( FALSE !== $user )
 				{
 					$author_id = $user->ID;
 				}
-			}
+			}//END else
 
-			if ( $author_id )
-			{
-				$client->SetFilter( 'post_author', array( (int) $author_id ), FALSE !== $exclude_position );
-			}
+			$client->SetFilter( 'post_author', array( (int) $author_id ), $exclusion );
 		} // END if
 
 		return TRUE;
