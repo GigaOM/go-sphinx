@@ -91,7 +91,7 @@ class GO_Sphinx
 
 	public function __construct()
 	{
-		add_action( 'init' , array( $this, 'init' ) , 10 );
+		add_action( 'init', array( $this, 'init' ) , 10 );
 
 		global $wpdb;
 		$this->index_name = $wpdb->posts . ',' . $wpdb->posts . $this->secondary_index_postfix;
@@ -111,12 +111,12 @@ class GO_Sphinx
 			{
 				$this->add_filters();
 			}
-		}
+		}//END if
 		else
 		{
 			$this->add_filters();
 		}
-	}
+	}//END __construcdt
 
 	public function init()
 	{
@@ -159,15 +159,15 @@ class GO_Sphinx
 			$this->client->SetServer( $config['server'], $config['port'] );
 			$this->client->SetConnectTimeout( $config['timeout'] );
 			$this->client->SetArrayResult( FALSE ); // other methods depend on the result array key being the post_id
-		}
+		}//END if
 
 		return $this->client;
-	}
+	}//END client
 
 	public function search_test()
 	{
 		$this->test()->search_test();
-	}
+	}//END search_test
 
 	public function test()
 	{
@@ -178,7 +178,7 @@ class GO_Sphinx
 		}
 
 		return $this->test;
-	}
+	}//END test
 
 	public function add_filters()
 	{
@@ -194,7 +194,7 @@ class GO_Sphinx
 
 		// used for scriblio facets integration
 		add_filter( 'scriblio_pre_get_matching_post_ids', array( $this, 'scriblio_pre_get_matching_post_ids' ), 10, 2 );
-	}
+	}//END add_filters
 
 	// initialize our states in this callback, which is invoked at the
 	// beginning of each query.
@@ -207,7 +207,7 @@ class GO_Sphinx
 		$this->search_stats = array();
 
 		return $query;
-	}
+	}//END parse_query
 
 	// filters to check if another plugin has modified wp query
 	public function add_tester_filters()
@@ -218,7 +218,7 @@ class GO_Sphinx
 			add_filter( $filter, array( $this, 'check_query' ), 1 );
 			add_filter( $filter, array( $this, 'check_query' ), 101 );
 		}
-	}
+	}//END add_tester_filters
 
 	// check if there is a user override to turn sphinx on or off
 	// using query params.
@@ -238,13 +238,13 @@ class GO_Sphinx
 		}
 
 		return GO_Sphinx::SPHINX_OVERRIDE_OFF;
-	}
+	}//END get_sphinx_override
 
 	// check if we're in debug mode or not
 	public function is_debug()
 	{
 		return ( isset( $_GET[ $this->qv_debug ] ) && current_user_can( 'edit_others_posts' ) );
-	}
+	}//END is_debug
 
 	// the callback to track whether another plugin has altered the
 	// query being processed
@@ -268,7 +268,7 @@ class GO_Sphinx
 		}
 
 		return $request;
-	}
+	}//END check_query
 
 	// check if we can use sphinx on this query or not
 	public function use_sphinx( $wp_query )
@@ -300,7 +300,7 @@ class GO_Sphinx
 			{
 				return FALSE;
 			}
-		}
+		}//END foreach
 
 		if (
 			isset( $wp_query->query['orderby'] ) &&
@@ -311,7 +311,7 @@ class GO_Sphinx
 		}
 
 		return TRUE;
-	}
+	}//END use_sphinx
 
 	// returns TRUE if we want the query to be "split", which means
 	// WP will first get the result post ids, and then look up the
@@ -320,7 +320,7 @@ class GO_Sphinx
 	public function split_the_query( $split_the_query, $wp_query )
 	{
 		return $this->use_sphinx( $wp_query ) ? TRUE : $split_the_query;
-	}
+	}//END split_the_query
 
 	// replace the request (SQL) to come up with search result post ids
 	public function posts_request_ids( $request, $wp_query )
@@ -368,7 +368,7 @@ class GO_Sphinx
 		}
 
 		return $request;
-	}
+	}//END posts_request_ids
 
 	// set the query to find out how many posts were found by the query.
 	// we replace the incoming query with a simple static sql query
@@ -382,7 +382,7 @@ class GO_Sphinx
 		}
 
 		return 'SELECT 0';
-	}
+	}//END found_posts_query
 
 	// overrides the number of posts found, this affects pagination.
 	public function found_posts( $found_posts, $wp_query )
@@ -393,7 +393,7 @@ class GO_Sphinx
 		}
 
 		return $found_posts;
-	}
+	}//END found_posts
 
 	// used for scriblio facets integration. this filter callback is
 	// invoked before scriblio facets tries to execute a sql query
@@ -412,7 +412,7 @@ class GO_Sphinx
 		}
 
 		return $this->matched_posts;
-	}
+	}//END scriblio_pre_get_matching_post_ids
 
 	// perform a sphinx query that's equivalent to the $wp_query
 	// returns WP_Error if we cannot use sphinx for this query.
@@ -487,8 +487,8 @@ class GO_Sphinx
 
 		$this->matched_posts = array_keys( $results['matches'] );
 		$this->total_found = $results['total_found'];
-		return array_slice( $this->matched_posts , 0, $this->posts_per_page );
-	}
+		return array_slice( $this->matched_posts, 0, $this->posts_per_page );
+	}//END sphinx_query
 
 	/**
 	 * parse order and orderby params in $wp_query and set the appropriate
@@ -591,7 +591,7 @@ class GO_Sphinx
 					$client->SetFilter( 'tt_id', $query['terms'], ( 'NOT IN' == $query['operator'] ) );
 				}
 			}//END foreach
-		}
+		}//END if
 		else
 		{
 			// the OR relation:
@@ -612,7 +612,7 @@ class GO_Sphinx
 				}
 				$wp_query->tax_query->transform_query( $query, 'term_taxonomy_id' );
 				$ttids = array_merge( $ttids, $query['terms'] );
-			}
+			}//END foreach
 
 			$client->SetFilter( 'tt_id', $ttids );
 		}//END else
@@ -644,7 +644,7 @@ class GO_Sphinx
 		}
 
 		return TRUE;
-	}
+	}//END sphinx_query_post_in_not_in
 
 	/**
 	 * parse the post_parent param in $wp_query and set the appropriate
@@ -670,7 +670,7 @@ class GO_Sphinx
 		$client->SetFilter( 'post_parent', $wp_query->query['post_parent'] );
 
 		return TRUE;
-	}
+	}//END sphinx_query_post_parent
 
 	/**
 	 * parse the pagination params in $wp_query and set the appropriate
@@ -718,7 +718,7 @@ class GO_Sphinx
 		// wp_kses() here because the query string is not going to be
 		// consumed by a browser.)
 		return '@(post_content,content) ' . trim( urldecode( stripslashes( $wp_query->query['s'] ) ) );
-	}
+	}//END sphinx_query_keyword
 
 	/**
 	 * parse the post_type param in $wp_query and convert it to an equivalent
@@ -741,8 +741,8 @@ class GO_Sphinx
 				{
 					$query_str = '@post_type ' . $wp_query->query['post_type'];
 				}
-			}
-		}
+			}//END if
+		}//END if
 		else
 		{
 			$query_str = '@post_type post'; // the WP default
@@ -770,14 +770,13 @@ class GO_Sphinx
 			{
 				$query_str = '@post_status ' . $wp_query->query['post_status'];
 			}
-		}
+		}//END if
 		else
 		{
 			$query_str = '@post_status publish'; // the WP default
 		}
 		return $query_str;
-	}//END sphinx_query_post_type
-
+	}//END sphinx_query_post_status
 
 	/**
 	 * parse author param in $wp_query and set the appropriate
@@ -818,9 +817,9 @@ class GO_Sphinx
 				// get an author id from author name
 				$author_name = $wp_query->query['author_name'];
 
-				$exclude_position = strpos( $author_name , '-' );
+				$exclude_position = strpos( $author_name, '-' );
 				if ( FALSE !== $exclude_position )
-				{ 
+				{
 					$author_name = substr( $author_name, $exclude_position + 1 );
 					$exclusion = TRUE;
 				}
@@ -849,9 +848,8 @@ class GO_Sphinx
 			$taxonomies[] = $tax_query['taxonomy'];
 		}
 		return $taxonomies;
-	}
-
-}//END GO_Sphinx
+	}//END extract_taxonomies
+}//END class
 
 /**
  * Singleton
