@@ -843,6 +843,11 @@ class GO_Sphinx
 	{
 		$taxonomies = array();
 
+		if ( ! isset( $wp_query->tax_query->queries ) )
+		{
+			return $taxonomies;
+		}
+
 		foreach( $wp_query->tax_query->queries as $tax_query )
 		{
 			$taxonomies[] = $tax_query['taxonomy'];
