@@ -75,9 +75,9 @@ class GO_Sphinx
 		'exclude',
 		'feed',
 		'fields',
-		'found_rows',
 		'ignore_sticky_posts',
 		'include',
+		'no_found_rows',
 		'numberposts',
 		'suppress_filters',
 	);
