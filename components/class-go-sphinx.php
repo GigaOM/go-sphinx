@@ -61,6 +61,7 @@ class GO_Sphinx
 		'posts_per_page',
 		'numberposts',
 		's',
+		'tag',
 		'tag_id',
 		'tag__in',
 		'tag__not_in',
@@ -71,11 +72,13 @@ class GO_Sphinx
 
 		/* these are allowed to pass through either because we allow them
 		   or because they're alternate keys used by WP */
-		'ignore_sticky_posts',
-		'numberposts',
-		'include',
 		'exclude',
+		'feed',
 		'fields',
+		'found_rows',
+		'ignore_sticky_posts',
+		'include',
+		'numberposts',
 		'suppress_filters',
 	);
 	// supported orderby keywords
@@ -301,7 +304,7 @@ class GO_Sphinx
 				! in_array( $key, $queried_taxonomies )
 			)
 			{
-				$this->messages[] = 'use_sphinx() FALSE: query contains unsupported query_vars';
+				$this->messages[] = 'use_sphinx() FALSE: query contains unsupported query_var: ' . $key;
 				return FALSE;
 			}
 		}//END foreach
@@ -311,7 +314,7 @@ class GO_Sphinx
 			! in_array( $wp_query->query['orderby'], $this->supported_order_by )
 		)
 		{
-			$this->messages[] = 'use_sphinx() FALSE: query contains unsupported order_by';
+			$this->messages[] = 'use_sphinx() FALSE: query contains unsupported order_by: ' . $wp_query->query['orderby'];
 			return FALSE;
 		}
 
@@ -334,7 +337,7 @@ class GO_Sphinx
 		if ( ! $this->use_sphinx( $wp_query ) )
 		{
 			$this->messages[] = 'posts_request_ids() use_sphinx() returned FALSE';
-			trigger_error( print_r( $this->messages, TRUE ) . "\n" . print_r( $wp_query, TRUE ) );
+//			error_log( print_r( $this->messages, TRUE ) . "\n" . print_r( $wp_query, TRUE ) );
 
 			return $request;
 		}
@@ -355,7 +358,7 @@ class GO_Sphinx
 		{
 			$this->search_stats['error'] = $result_ids;
 			$this->messages[] = 'posts_request_ids() got an error from sphinx_query()';
-			trigger_error( print_r( $this->messages, TRUE ) . "\n" . print_r( $wp_query, TRUE ) );
+//			error_log( print_r( $this->messages, TRUE ) . "\n" . print_r( $wp_query, TRUE ) );
 
 			return $request;
 		}
