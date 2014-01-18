@@ -79,6 +79,7 @@ class GO_Sphinx
 		'include',
 		'no_found_rows',
 		'numberposts',
+		'output',
 		'suppress_filters',
 	);
 	// supported orderby keywords
@@ -204,6 +205,8 @@ class GO_Sphinx
 	// beginning of each query.
 	public function parse_query( $query )
 	{
+		$this->messages[] = 'parse_query(): parsing a new query';
+
 		//TODO: add all filters here if we're going to remove them all
 		// after the query's over
 		$this->query_modified = FALSE;
@@ -304,7 +307,7 @@ class GO_Sphinx
 				! in_array( $key, $queried_taxonomies )
 			)
 			{
-				$this->messages[] = 'use_sphinx() FALSE: query contains unsupported query_var: ' . $key;
+				$this->messages[] = 'use_sphinx() FALSE: query contains unsupported query_var: ' . $key . '=' . var_export( $val, TRUE );
 				return FALSE;
 			}
 		}//END foreach
@@ -314,7 +317,7 @@ class GO_Sphinx
 			! in_array( $wp_query->query['orderby'], $this->supported_order_by )
 		)
 		{
-			$this->messages[] = 'use_sphinx() FALSE: query contains unsupported order_by: ' . $wp_query->query['orderby'];
+			$this->messages[] = 'use_sphinx() FALSE: query contains unsupported order_by: ' . var_export( $wp_query->query['orderby'], TRUE );
 			return FALSE;
 		}
 
@@ -337,7 +340,7 @@ class GO_Sphinx
 		if ( ! $this->use_sphinx( $wp_query ) )
 		{
 			$this->messages[] = 'posts_request_ids() use_sphinx() returned FALSE';
-//			error_log( print_r( $this->messages, TRUE ) . "\n" . print_r( $wp_query, TRUE ) );
+			error_log( print_r( $this->messages, TRUE ) . "\n" . print_r( $wp_query, TRUE ) );
 
 			return $request;
 		}
@@ -358,7 +361,7 @@ class GO_Sphinx
 		{
 			$this->search_stats['error'] = $result_ids;
 			$this->messages[] = 'posts_request_ids() got an error from sphinx_query()';
-//			error_log( print_r( $this->messages, TRUE ) . "\n" . print_r( $wp_query, TRUE ) );
+			error_log( print_r( $this->messages, TRUE ) . "\n" . print_r( $wp_query, TRUE ) );
 
 			return $request;
 		}
@@ -502,7 +505,7 @@ class GO_Sphinx
 
 		if ( FALSE == $results )
 		{
-			$this->messages[] = 'sphinx_query(): the sphinx client returned FALSE';
+			$this->messages[] = 'sphinx_query(): the sphinx client returned FALSE, possibly an error: ' . var_export( $client->GetLastError(), TRUE );
 
 			return new WP_Error( 'sphinx query error', $client->GetLastError() );
 		}
@@ -521,7 +524,7 @@ class GO_Sphinx
 
 		$this->matched_posts = array_keys( $results['matches'] );
 		$this->total_found = $results['total_found'];
-		$this->messages[] = 'sphinx_query(): the sphinx client returned ' . $results['total_found'] .'total results';
+		$this->messages[] = 'sphinx_query(): the sphinx client returned ' . $results['total_found'] .' total results';
 
 		return array_slice( $this->matched_posts, 0, $this->posts_per_page );
 	}//END sphinx_query
