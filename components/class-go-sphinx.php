@@ -84,14 +84,18 @@ class GO_Sphinx
 	);
 	// supported orderby keywords
 	public $supported_order_by = array(
-		'none',
-		'ID',
-		'title',
-		'date',
-		'modified',
-		'parent',
-		'rand',
 		'comment_count',
+		'date',
+		'post_date',
+		'ID',
+		'modified',
+		'post_modified',
+		'none',
+		'parent',
+		'post_parent',
+		'rand',
+		'title',
+		'post_title',
 	);
 
 	public function __construct()
