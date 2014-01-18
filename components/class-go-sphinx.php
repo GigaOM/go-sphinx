@@ -9,6 +9,7 @@ class GO_Sphinx
 	public $client = FALSE;
 	public $test   = FALSE;
 	public $version = 2;
+	public $messages = array();
 	public $index_name = FALSE;
 	public $filter_args = array();
 	public $query_modified = FALSE; // did another plugin modify the current query?
@@ -60,6 +61,7 @@ class GO_Sphinx
 		'posts_per_page',
 		'numberposts',
 		's',
+		'tag',
 		'tag_id',
 		'tag__in',
 		'tag__not_in',
@@ -70,23 +72,30 @@ class GO_Sphinx
 
 		/* these are allowed to pass through either because we allow them
 		   or because they're alternate keys used by WP */
-		'ignore_sticky_posts',
-		'numberposts',
-		'include',
 		'exclude',
+		'feed',
 		'fields',
+		'ignore_sticky_posts',
+		'include',
+		'no_found_rows',
+		'numberposts',
+		'output',
 		'suppress_filters',
 	);
 	// supported orderby keywords
 	public $supported_order_by = array(
-		'none',
-		'ID',
-		'title',
-		'date',
-		'modified',
-		'parent',
-		'rand',
 		'comment_count',
+		'date',
+		'post_date',
+		'ID',
+		'modified',
+		'post_modified',
+		'none',
+		'parent',
+		'post_parent',
+		'rand',
+		'title',
+		'post_title',
 	);
 
 	public function __construct()
@@ -200,6 +209,8 @@ class GO_Sphinx
 	// beginning of each query.
 	public function parse_query( $query )
 	{
+		$this->messages[] = 'parse_query(): parsing a new query';
+
 		//TODO: add all filters here if we're going to remove them all
 		// after the query's over
 		$this->query_modified = FALSE;
@@ -276,6 +287,7 @@ class GO_Sphinx
 		// cannot use sphinx if the query has been modified by another plugin
 		if ( $this->query_modified )
 		{
+			$this->messages[] = 'use_sphinx() FALSE: query_modified is TRUE';
 			return FALSE;
 		}
 
@@ -284,6 +296,7 @@ class GO_Sphinx
 		// check manual override first
 		if ( ( GO_Sphinx::SPHINX_OVERRIDE_OFF == $this->get_sphinx_override() ) && current_user_can( 'edit_others_posts' ) )
 		{
+			$this->messages[] = 'use_sphinx() FALSE: get_sphinx_override() is TRUE';
 			return FALSE;
 		}
 
@@ -296,8 +309,9 @@ class GO_Sphinx
 				! in_array( $key, $this->supported_query_vars ) &&
 				! empty( $wp_query->query[ $key ] ) &&
 				! in_array( $key, $queried_taxonomies )
-				)
+			)
 			{
+				$this->messages[] = 'use_sphinx() FALSE: query contains unsupported query_var: ' . $key . '=' . var_export( $val, TRUE );
 				return FALSE;
 			}
 		}//END foreach
@@ -305,11 +319,13 @@ class GO_Sphinx
 		if (
 			isset( $wp_query->query['orderby'] ) &&
 			! in_array( $wp_query->query['orderby'], $this->supported_order_by )
-			)
+		)
 		{
+			$this->messages[] = 'use_sphinx() FALSE: query contains unsupported order_by: ' . var_export( $wp_query->query['orderby'], TRUE );
 			return FALSE;
 		}
 
+		$this->messages[] = 'use_sphinx() TRUE';
 		return TRUE;
 	}//END use_sphinx
 
@@ -327,6 +343,9 @@ class GO_Sphinx
 	{
 		if ( ! $this->use_sphinx( $wp_query ) )
 		{
+			$this->messages[] = 'posts_request_ids() use_sphinx() returned FALSE';
+			error_log( print_r( $this->messages, TRUE ) . "\n" . print_r( $wp_query, TRUE ) );
+
 			return $request;
 		}
 
@@ -334,7 +353,7 @@ class GO_Sphinx
 
 		// return a SQL query that encodes the sphinx search results like
 		// SELECT ID from wp_posts
-		// WHERE ID IN ( 5324, 1231) ORDER BY FIELD( ID, 5324, 1231)
+		// WHERE ID IN ( 5324, 1231 ) ORDER BY FIELD( ID, 5324, 1231 )
 		$t0 = microtime( TRUE );
 		$result_ids = $this->sphinx_query( $wp_query );
 
@@ -345,6 +364,9 @@ class GO_Sphinx
 		if ( is_wp_error( $result_ids ) )
 		{
 			$this->search_stats['error'] = $result_ids;
+			$this->messages[] = 'posts_request_ids() got an error from sphinx_query()';
+			error_log( print_r( $this->messages, TRUE ) . "\n" . print_r( $wp_query, TRUE ) );
+
 			return $request;
 		}
 
@@ -355,14 +377,19 @@ class GO_Sphinx
 			$this->search_stats['posts_equality'] = ( $this->search_stats['posts_mysql'] == $this->search_stats['posts_sphinx'] );
 
 			wp_localize_script( 'go-sphinx-js', 'sphinx_results', (array) $this->search_stats );
+			wp_localize_script( 'go-sphinx-js', 'sphinx_messages', (array) $this->messages );
 		}
 
 		if ( 0 < count( $result_ids ) )
 		{
+			$this->messages[] = 'posts_request_ids() returning post_ids from Sphinx';
+
 			$request = "SELECT ID FROM $wpdb->posts WHERE ID IN (" . implode( ',', $result_ids ) . ') ORDER BY FIELD ( ID, ' . implode( ',', $result_ids ) . ')';
 		}
 		else
 		{
+			$this->messages[] = 'posts_request_ids() returning a query intended to fail';
+
 			// return a sql that returns nothing
 			$request = "SELECT ID FROM $wpdb->posts WHERE 1 = 0";
 		}
@@ -426,30 +453,40 @@ class GO_Sphinx
 		// author
 		if ( is_wp_error( $res = $this->sphinx_query_author( $client, $wp_query ) ) )
 		{
+			$this->messages[] = 'sphinx_query(): sphinx_query_author() returned an error';
+
 			return $res;
 		}
 
 		// order and orderby
 		if ( is_wp_error( $res = $this->sphinx_query_ordering( $client, $wp_query ) ) )
 		{
+			$this->messages[] = 'sphinx_query(): sphinx_query_ordering() returned an error';
+
 			return $res;
 		}
 
 		// tax_query
 		if ( is_wp_error( $res = $this->sphinx_query_taxonomy( $client, $wp_query ) ) )
 		{
+			$this->messages[] = 'sphinx_query(): sphinx_query_taxonomy() returned an error';
+
 			return $res;
 		}
 
 		// post__in and post__not_in
 		if ( is_wp_error( $res = $this->sphinx_query_post_in_not_in( $client, $wp_query ) ) )
 		{
+			$this->messages[] = 'sphinx_query(): sphinx_query_post_in_not_in() returned an error';
+
 			return $res;
 		}
 
 		// post_parent
 		if ( is_wp_error( $res = $this->sphinx_query_post_parent( $client, $wp_query ) ) )
 		{
+			$this->messages[] = 'sphinx_query(): sphinx_query_post_parent() returned an error';
+
 			return $res;
 		}
 
@@ -472,6 +509,8 @@ class GO_Sphinx
 
 		if ( FALSE == $results )
 		{
+			$this->messages[] = 'sphinx_query(): the sphinx client returned FALSE, possibly an error: ' . var_export( $client->GetLastError(), TRUE );
+
 			return new WP_Error( 'sphinx query error', $client->GetLastError() );
 		}
 
@@ -482,11 +521,15 @@ class GO_Sphinx
 
 		if ( ! isset( $results['matches'] ) )
 		{
+			$this->messages[] = 'sphinx_query(): the sphinx client returned an empty result set';
+
 			return array();
 		}
 
 		$this->matched_posts = array_keys( $results['matches'] );
 		$this->total_found = $results['total_found'];
+		$this->messages[] = 'sphinx_query(): the sphinx client returned ' . $results['total_found'] .' total results';
+
 		return array_slice( $this->matched_posts, 0, $this->posts_per_page );
 	}//END sphinx_query
 
