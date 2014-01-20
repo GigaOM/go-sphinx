@@ -8,7 +8,7 @@ class GO_Sphinx
 	public $admin  = FALSE;
 	public $client = FALSE;
 	public $log_debug_info = FALSE;
-	public $error_429_on_query_fail = FALSE;
+	public $error_429_on_query_error = FALSE;
 	public $test = FALSE;
 	public $version = 2;
 	public $messages = array();
@@ -168,7 +168,7 @@ class GO_Sphinx
 			), 'go-sphinx' ) );
 
 			$this->log_debug_info = isset( $config['log_debug_info'] ) ? $config['log_debug_info'] : $this->log_debug_info;
-			$this->error_429_on_query_fail = isset( $config['error_429_on_query_fail'] ) ? $config['error_429_on_query_fail'] : $this->error_429_on_query_fail;
+			$this->error_429_on_query_error = isset( $config['error_429_on_query_error'] ) ? $config['error_429_on_query_error'] : $this->error_429_on_query_error;
 
 			$this->client->SetServer( $config['server'], $config['port'] );
 			$this->client->SetConnectTimeout( $config['timeout'] );
@@ -523,11 +523,11 @@ class GO_Sphinx
 		{
 			$this->messages[] = 'sphinx_query(): the sphinx client returned FALSE, possibly an error: ' . var_export( $client->GetLastError(), TRUE );
 
-			error_log( print_r( $this->messages, TRUE ) );
+			error_log( 'go-sphinx connection error: ' . var_export( $client->GetLastError(), TRUE ) );
 
-			if ( $this->error_429_on_query_fail )
+			if ( $this->error_429_on_query_error )
 			{
-				wp_die( 'Wow, it\'s hot in here! The servers are really busy right now, please try your request again in a moment', 'Whoa Nelly!', array( 'response' => 429 ) );
+				wp_die( '<p>Wow, it\'s hot in here!</p><p>The servers are really busy right now, please try your request again in a moment.</p>', 'Whoa Nelly!', array( 'response' => 429 ) );
 			} // END if
 
 			return new WP_Error( 'sphinx query error', $client->GetLastError() );
