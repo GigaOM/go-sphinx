@@ -17,6 +17,7 @@ class GO_Sphinx
 	public $query_modified = FALSE; // did another plugin modify the current query?
 	public $search_stats = array();
 	public $posts_per_page = 10;
+	public $max_page_size = 1000; // matches what scriblio expects
 	public $max_results = 1000;
 	public $secondary_index_postfix = '_delta';
 	public $admin_cap = 'manage_options';
@@ -505,7 +506,7 @@ class GO_Sphinx
 		// pagination
 		$this->sphinx_query_pagination( $client, $wp_query );
 
-		// these quyery vars are implemented as sphinx query string
+		// these query vars are implemented as sphinx query string
 		$query_strs = array();
 
 		$query_strs[] = $this->sphinx_query_keyword( $wp_query );
@@ -758,7 +759,16 @@ class GO_Sphinx
 			$offset = ($wp_query->query['paged'] - 1 ) * $this->posts_per_page;
 		}
 
-		$client->SetLimits( $offset, $this->max_results, $this->max_results );
+		// check if the request exceeded our limit. if so show an error
+		// without continuing
+		if ( $this->max_results < ( $offset + $this->posts_per_page ) )
+		{
+			wp_die( '<p>You\'ve taken it (number of search results) above the limit, one more time!</p><p>(Maximum number of search results exceeded.)</p>', 'Whoa Nelly!', array( 'response' => 429 ) );
+		}
+
+		// we're using $this->max_page_size here for the number of results
+		// needed by scriblio to work with after each query
+		$client->SetLimits( $offset, $this->max_page_size, $this->max_results );
 	}//END sphinx_query_pagination
 
 	/**
