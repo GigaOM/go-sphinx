@@ -7,7 +7,9 @@ class GO_Sphinx
 
 	public $admin  = FALSE;
 	public $client = FALSE;
-	public $test   = FALSE;
+	public $log_debug_info = FALSE;
+	public $error_429_on_query_error = FALSE;
+	public $test = FALSE;
 	public $version = 2;
 	public $messages = array();
 	public $index_name = FALSE;
@@ -164,6 +166,9 @@ class GO_Sphinx
 				'port'        => 9312,
 				'timeout'     => 1,
 			), 'go-sphinx' ) );
+
+			$this->log_debug_info = isset( $config['log_debug_info'] ) ? $config['log_debug_info'] : $this->log_debug_info;
+			$this->error_429_on_query_error = isset( $config['error_429_on_query_error'] ) ? $config['error_429_on_query_error'] : $this->error_429_on_query_error;
 
 			$this->client->SetServer( $config['server'], $config['port'] );
 			$this->client->SetConnectTimeout( $config['timeout'] );
@@ -342,9 +347,12 @@ class GO_Sphinx
 	public function posts_request_ids( $request, $wp_query )
 	{
 		if ( ! $this->use_sphinx( $wp_query ) )
-		{
-			$this->messages[] = 'posts_request_ids() use_sphinx() returned FALSE';
-			error_log( print_r( $this->messages, TRUE ) . "\n" . print_r( $wp_query, TRUE ) );
+		{		
+			if ( $this->log_debug_info )
+			{
+				$this->messages[] = 'posts_request_ids() use_sphinx() returned FALSE';
+				error_log( print_r( $this->messages, TRUE ) . "\n" . print_r( $wp_query, TRUE ) );
+			} // END if
 
 			return $request;
 		}
@@ -364,8 +372,12 @@ class GO_Sphinx
 		if ( is_wp_error( $result_ids ) )
 		{
 			$this->search_stats['error'] = $result_ids;
-			$this->messages[] = 'posts_request_ids() got an error from sphinx_query()';
-			error_log( print_r( $this->messages, TRUE ) . "\n" . print_r( $wp_query, TRUE ) );
+
+			if ( $this->log_debug_info )
+			{
+				$this->messages[] = 'posts_request_ids() got an error from sphinx_query()';
+				error_log( print_r( $this->messages, TRUE ) . "\n" . print_r( $wp_query, TRUE ) );
+			} // END if
 
 			return $request;
 		}
@@ -510,6 +522,13 @@ class GO_Sphinx
 		if ( FALSE == $results )
 		{
 			$this->messages[] = 'sphinx_query(): the sphinx client returned FALSE, possibly an error: ' . var_export( $client->GetLastError(), TRUE );
+
+			error_log( 'go-sphinx connection error: ' . var_export( $client->GetLastError(), TRUE ) );
+
+			if ( $this->error_429_on_query_error )
+			{
+				wp_die( '<p>Wow, it\'s hot in here!</p><p>The servers are really busy right now, please try your request again in a moment.</p>', 'Whoa Nelly!', array( 'response' => 429 ) );
+			} // END if
 
 			return new WP_Error( 'sphinx query error', $client->GetLastError() );
 		}
