@@ -1,5 +1,4 @@
 <?php
-
 /**
  * tests to compare WP_Query and Sphinx search results.
  */
@@ -14,6 +13,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 	{
 		parent::__construct();
 		add_action( 'wp_ajax_go_sphinx_search_test', array( $this, 'search_test' ), 11 );
+		add_action( 'wp_ajax_go_sphinx_ql_test', array( $this, 'ql_test' ), 11 );
 	}
 
 	public function search_test()
@@ -206,7 +206,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 			echo '<h2><font color="green">all ' . $this->test_count . " tests passed.</font></h2>\n\n";
 		}
 		die;
-	}
+	}//END search_test
 
 	/**
 	 * "1. Query for the 10 most recent posts (not necessarily post_type=post)
@@ -398,7 +398,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 			echo "no post found\n\n";
 			return FALSE;
 		}
-	}//END wp_query_ten_most_recent_posts
+	}//END wp_query_ten_posts
 
 	public function sphinx_ten_posts( $orderby, $order )
 	{
@@ -422,12 +422,12 @@ class GO_Sphinx_Test extends GO_Sphinx
 		}
 		else
 		{
-			echo "query error: ";
+			echo 'query error: ';
 			print_r( $client->GetLastError() );
 			echo "\n\n";
 			return FALSE;
 		}
-	}//END sphinx_ten_most_recent_posts
+	}//END sphinx_ten_posts
 
 	public function extract_sphinx_matches_ids( $sp_results )
 	{
@@ -467,8 +467,8 @@ class GO_Sphinx_Test extends GO_Sphinx
 				{
 					break;
 				}
-			}
-		}
+			}//END if
+		}//END foreach
 
 		// order = DESC seems to list count of 0 first so we have to
 		// make sure to skip posts with count of 0
@@ -502,18 +502,20 @@ class GO_Sphinx_Test extends GO_Sphinx
 				}
 				$tax_query[] = $query_arg;
 				$ttids[] = $term->term_taxonomy_id;
-			}
-		}
+			}//END foreach
+		}//END if
 		else
 		{
 			// in this case $terms is just a single term object
-			$tax_query = array( array(
-								'taxonomy' => $terms->taxonomy,
-								'field' => 'id',
-								'terms' => $terms->term_id,
-								) );
+			$tax_query = array(
+				array(
+					'taxonomy' => $terms->taxonomy,
+					'field' => 'id',
+					'terms' => $terms->term_id,
+				),
+			);
 			$ttids = array( $terms->term_taxonomy_id );
-		}
+		}//END else
 
 		// pages start at 1
 		if ( $page_num === 0 )
@@ -580,8 +582,8 @@ class GO_Sphinx_Test extends GO_Sphinx
 				// documents that match all terms passed in so we need to
 				// call SetFilter() once on each term/tt_id.
 				$client->SetFilter( 'tt_id', array( $term->term_taxonomy_id ) );
-			}
-		}
+			}//END foreach
+		}//END if
 		else
 		{
 			$ttids[] = $terms->term_taxonomy_id;
@@ -611,7 +613,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 
 		if ( FALSE === $results )
 		{
-			echo "query error: ";
+			echo 'query error: ';
 			print_r( $client->GetLastError() );
 			echo "\n\n";
 			return FALSE;
@@ -693,7 +695,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 			}
 
 			$post_ids_to_ttids[ $post_id ] = $ttids;
-		}
+		}//END foreach
 
 		// now look for two posts and a term in each post that only appears
 		// in that post.
@@ -711,12 +713,12 @@ class GO_Sphinx_Test extends GO_Sphinx
 						break; // we found enough results
 					}
 				}
-			}
+			}//END foreach
 			if ( 2 <= count( $query_terms ) )
 			{
 				break;
 			}
-		}
+		}//END foreach
 
 		return $query_terms;
 	} //END setup_mutually_exclusive_posts_test
@@ -764,9 +766,9 @@ class GO_Sphinx_Test extends GO_Sphinx
 				$test_failed = TRUE;
 				break;
 			}
-		}
+		}//END foreach
 
-		echo 'WP_Query for test ' . $this->test_count . ' ' . ( ( $test_failed ) ? "FAILED" : "PASSED" ) . ".\n\n";
+		echo 'WP_Query for test ' . $this->test_count . ' ' . ( ( $test_failed ) ? 'FAILED' : 'PASSED' ) . ".\n\n";
 
 		return ( ! $test_failed );
 	} // END WP_mutually_exclusive_posts_test
@@ -775,12 +777,15 @@ class GO_Sphinx_Test extends GO_Sphinx
 	{
 		foreach ( $post_ids as $post_id => $ttid_list )
 		{
-			if ( $post_id == $post_to_ignore ) continue;
+			if ( $post_id == $post_to_ignore )
+			{
+				continue;
+			}
 			if ( in_array($ttid, $ttid_list) )
 			{
 				return TRUE;
 			}
-		}
+		}//END foreach
 
 		return FALSE;
 	} // END is_ttid_in_array
@@ -822,7 +827,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 
 		if ( FALSE === $results )
 		{
-			echo "query error: ";
+			echo 'query error: ';
 			print_r( $client->GetLastError() );
 			echo "\n\n";
 			return FALSE;
@@ -844,9 +849,9 @@ class GO_Sphinx_Test extends GO_Sphinx
 				$test_failed = TRUE;
 				break;
 			}
-		}
+		}//END foreach
 
-		echo 'Sphinx query for test ' . $this->test_count . ' ' . ( ( $test_failed ) ? "FAILED" : "PASSED" ) . ".\n\n";
+		echo 'Sphinx query for test ' . $this->test_count . ' ' . ( ( $test_failed ) ? 'FAILED' : 'PASSED' ) . ".\n\n";
 
 		return ( ! $test_failed );
 	}//END SP_mutually_exclusive_posts_test
@@ -911,7 +916,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 
 		if ( FALSE === $spx_results )
 		{
-			echo "query error: ";
+			echo 'query error: ';
 			print_r( $client->GetLastError() );
 			echo "\n\n";
 			return FALSE;
@@ -1045,7 +1050,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 		}
 		else
 		{
-			echo "query error: ";
+			echo 'query error: ';
 			print_r( $client->GetLastError() );
 			echo "\n\n";
 			return FALSE;
@@ -1111,7 +1116,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 				echo "FAILED: some excluded posts were still found in search results.\n\n";
 				$test_failed = TRUE;
 			}
-		}
+		}//END else
 
 		// sphinx search
 		$this->client = FALSE; // ensure we get a new instance
@@ -1124,7 +1129,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 
 		if ( FALSE === $spx_results )
 		{
-			echo "query error: ";
+			echo 'query error: ';
 			print_r( $client->GetLastError() );
 			echo "\n---\n\n";
 			return FALSE;
@@ -1149,7 +1154,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 				echo "FAILED: some excluded posts were still found in search results.\n\n";
 				$test_failed = TRUE;
 			}
-		}
+		}//END else
 
 		echo "---\n\n";
 
@@ -1206,7 +1211,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 				echo "FAILED: unexpected id found in search results.\n\n";
 				$test_failed = TRUE;
 			}
-		}
+		}//END else
 
 		// sphinx search
 		$this->client = FALSE; // ensure we get a new instance
@@ -1219,7 +1224,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 
 		if ( FALSE === $spx_results )
 		{
-			echo "query error: ";
+			echo 'query error: ';
 			print_r( $client->GetLastError() );
 			echo "\n---\n\n";
 			return FALSE;
@@ -1241,7 +1246,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 				echo "FAILED: unexpected id found in search results.\n\n";
 				$test_failed = TRUE;
 			}
-		}
+		}//END else
 
 		echo "---\n\n";
 
@@ -1299,7 +1304,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 			}
 		}
 
-		echo 'WP_Query for test ' . $this->test_count . ' ' . ( ( $test_failed ) ? "FAILED" : "PASSED" ) . ".\n\n";
+		echo 'WP_Query for test ' . $this->test_count . ' ' . ( ( $test_failed ) ? 'FAILED' : 'PASSED' ) . ".\n\n";
 
 		$this->client = FALSE; // ensure we get a new instance
 		$client = $this->client();
@@ -1318,7 +1323,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 
 		if ( FALSE === $results )
 		{
-			echo "query error: ";
+			echo 'query error: ';
 			print_r( $client->GetLastError() );
 			echo "\n\n";
 			return FALSE;
@@ -1337,7 +1342,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 			}
 		}
 
-		echo 'Sphinx query for test ' . $this->test_count . ' ' . ( ( $test_failed ) ? "FAILED" : "PASSED" ) . ".\n\n";
+		echo 'Sphinx query for test ' . $this->test_count . ' ' . ( ( $test_failed ) ? 'FAILED' : 'PASSED' ) . ".\n\n";
 		echo "---\n\n";
 
 		return ( ! $test_failed );
@@ -1366,7 +1371,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 					break;
 				}
 			}
-		}
+		}//END foreach
 
 		$wp_author_results = $this->wp_query_all_author_posts( $author_ids );
 
@@ -1526,7 +1531,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 			{
 				$query_var = $include ? 'tag__in' : 'tag__not_in';
 			}
-		}
+		}//END else
 
 		$test_type = $include ? '' : 'of "not_in" search ';
 
@@ -1579,7 +1584,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 		echo "---\n\n";
 
 		return ( ! $test_failed );
-	}//END category_test
+	}//END terms_test
 
 	/**
 	 * 17. Pick two categories from one of the posts from #1, then query
@@ -1996,6 +2001,19 @@ class GO_Sphinx_Test extends GO_Sphinx
 		}
 
 		return $ids;
-	}
+	}//END get_ids_from_posts
 
+	/**
+	 * SphinxQL test
+	 */
+	public function ql_test()
+	{
+		$wpdb = new wpdb( 'user', 'pass', 'dbname', '127.0.0.1:9306' );
+
+		echo "<pre>\n";
+		print_r( $wpdb->get_results( 'SELECT * FROM wp_3_posts_delta, wp_3_posts WHERE match(\'' . $_REQUEST['s'] . '\')' ) );
+		echo "</pre>\n";
+
+		die;
+	}//END ql_test
 }//END GO_Sphinx_Test
