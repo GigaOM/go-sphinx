@@ -1,16 +1,15 @@
 <?php
-
 class GO_Sphinx
 {
 	const SPHINX_OVERRIDE_ON  = 1;
 	const SPHINX_OVERRIDE_OFF = 2;
 
 	public $admin  = FALSE;
-	public $client = FALSE;
+	public $wpdb   = NULL; // our wpdb interface to sphinxql
 	public $log_debug_info = FALSE;
 	public $error_429_on_query_error = FALSE;
 	public $test = FALSE;
-	public $version = 2;
+	public $version = 3;
 	public $messages = array();
 	public $index_name = FALSE;
 	public $filter_args = array();
@@ -19,7 +18,6 @@ class GO_Sphinx
 	public $posts_per_page = 10;
 	public $max_results = 1000;
 	public $secondary_index_postfix = '_delta';
-	public $admin_cap = 'manage_options';
 	public $qv_debug = 'go-sphinx-debug';
 	public $qv_use_sphinx = 'go-sphinx-use';
 	public $filters_to_watch = array(
@@ -102,10 +100,10 @@ class GO_Sphinx
 
 	public function __construct()
 	{
-		add_action( 'init', array( $this, 'init' ) , 10 );
+		add_action( 'init', array( $this, 'init' ), 10 );
 
 		global $wpdb;
-		$this->index_name = $wpdb->posts . ',' . $wpdb->posts . $this->secondary_index_postfix;
+		$this->index_name = $wpdb->posts . $this->secondary_index_postfix . ',' . $wpdb->posts;
 
 		// the admin settings page
 		if ( is_admin() )
@@ -118,7 +116,7 @@ class GO_Sphinx
 			// one to compare the results of our implementation with the
 			// results of direct sphinx queries (with the
 			// $this->qv_use_sphinx=1 url param).
-			if ( GO_Sphinx::SPHINX_OVERRIDE_ON == $this->get_sphinx_override() )
+			if ( self::SPHINX_OVERRIDE_ON == $this->get_sphinx_override() )
 			{
 				$this->add_filters();
 			}
@@ -127,7 +125,7 @@ class GO_Sphinx
 		{
 			$this->add_filters();
 		}
-	}//END __construcdt
+	}//END __construct
 
 	public function init()
 	{
@@ -137,7 +135,38 @@ class GO_Sphinx
 			wp_register_script( 'go-sphinx-js', $plugin_url . '/js/go-sphinx.js', array( 'jquery' ), $this->version, TRUE );
 			wp_enqueue_script( 'go-sphinx-js');
 		}
-	}
+	}//END init
+
+	/**
+	 * get an instance of our wpdb connection to sphinx. (not to be confused
+	 * with global $wpdb)
+	 */
+	public function wpdb()
+	{
+		if ( ! $this->wpdb )
+		{
+			$config = apply_filters(
+				'go_config',
+				array(
+					'server'      => '127.0.0.1',
+					'mysql_port'  => 9306,
+				),
+				'go-sphinx'
+			);
+
+			$this->wpdb = new wpdb(
+				'unused_username',
+				'unused_password',
+				'unused_dbname',
+				$config['server'] . ':' . $config['mysql_port']
+			);
+
+			$this->log_debug_info = isset( $config['log_debug_info'] ) ? $config['log_debug_info'] : $this->log_debug_info;
+			$this->error_429_on_query_error = isset( $config['error_429_on_query_error'] ) ? $config['error_429_on_query_error'] : $this->error_429_on_query_error;
+		}//END if
+
+		return $this->wpdb;
+	}//END wpdb
 
 	public function admin()
 	{
@@ -148,35 +177,7 @@ class GO_Sphinx
 		}
 
 		return $this->admin;
-	}
-
-	public function client( $config = array() )
-	{
-		// TODO: cache client by query params -- we can't simply
-		// reuse the same client if another caller has set some
-		// of its search params or it would affect the next search
-		// in unexpected ways.
-		if ( ! $this->client || ! empty( $config ) )
-		{
-			require_once __DIR__ . '/externals/sphinxapi.php';
-			$this->client = new SphinxClient();
-
-			$config = wp_parse_args( $config, apply_filters( 'go_config', array(
-				'server'      => 'localhost',
-				'port'        => 9312,
-				'timeout'     => 1,
-			), 'go-sphinx' ) );
-
-			$this->log_debug_info = isset( $config['log_debug_info'] ) ? $config['log_debug_info'] : $this->log_debug_info;
-			$this->error_429_on_query_error = isset( $config['error_429_on_query_error'] ) ? $config['error_429_on_query_error'] : $this->error_429_on_query_error;
-
-			$this->client->SetServer( $config['server'], $config['port'] );
-			$this->client->SetConnectTimeout( $config['timeout'] );
-			$this->client->SetArrayResult( FALSE ); // other methods depend on the result array key being the post_id
-		}//END if
-
-		return $this->client;
-	}//END client
+	}//END admin
 
 	public function search_test()
 	{
@@ -250,10 +251,10 @@ class GO_Sphinx
 
 		if ( '1' == $_GET[ $this->qv_use_sphinx ] )
 		{
-			return GO_Sphinx::SPHINX_OVERRIDE_ON;
+			return self::SPHINX_OVERRIDE_ON;
 		}
 
-		return GO_Sphinx::SPHINX_OVERRIDE_OFF;
+		return self::SPHINX_OVERRIDE_OFF;
 	}//END get_sphinx_override
 
 	// check if we're in debug mode or not
@@ -299,7 +300,7 @@ class GO_Sphinx
 		// parse $wp_query to determine if we can use sphinx for this
 		// search or not.
 		// check manual override first
-		if ( ( GO_Sphinx::SPHINX_OVERRIDE_OFF == $this->get_sphinx_override() ) && current_user_can( 'edit_others_posts' ) )
+		if ( ( self::SPHINX_OVERRIDE_OFF == $this->get_sphinx_override() ) && current_user_can( 'edit_others_posts' ) )
 		{
 			$this->messages[] = 'use_sphinx() FALSE: get_sphinx_override() is TRUE';
 			return FALSE;
@@ -347,7 +348,7 @@ class GO_Sphinx
 	public function posts_request_ids( $request, $wp_query )
 	{
 		if ( ! $this->use_sphinx( $wp_query ) )
-		{		
+		{
 			if ( $this->log_debug_info )
 			{
 				$this->messages[] = 'posts_request_ids() use_sphinx() returned FALSE';
@@ -380,7 +381,7 @@ class GO_Sphinx
 			} // END if
 
 			return $request;
-		}
+		}//END if
 
 		if ( $this->is_debug() )
 		{
@@ -453,116 +454,222 @@ class GO_Sphinx
 		return $this->matched_posts;
 	}//END scriblio_pre_get_matching_post_ids
 
-	// perform a sphinx query that's equivalent to the $wp_query
+	// perform a sphinxql query that's equivalent to the $wp_query
 	// returns WP_Error if we cannot use sphinx for this query.
 	public function sphinx_query( $wp_query )
 	{
-		$ids = array(); // our results
-		$this->client = NULL;
-		$client = $this->client();
+		// parts of the sphinxql query string w're building
+		$sphinxql_select = array( 'id' );
+		$sphinxql_where = array();
+		$sphinxql_orderby = '';
+		$sphinxql_limit = '';
 
-		// these WP query vars are implemented as sphinx filters
-		// author
-		if ( is_wp_error( $res = $this->sphinx_query_author( $client, $wp_query ) ) )
+		// these WP query vars are implemented as sphinxql WHERE clauses
+		// *** author ***
+		$res = $this->sphinx_query_author( $wp_query );
+		if ( ! empty( $res ) )
 		{
-			$this->messages[] = 'sphinx_query(): sphinx_query_author() returned an error';
-
-			return $res;
+			$sphinxql_where[] = $res;
 		}
 
-		// order and orderby
-		if ( is_wp_error( $res = $this->sphinx_query_ordering( $client, $wp_query ) ) )
+		// *** order and orderby ***
+		if ( is_wp_error( $res = $this->sphinx_query_ordering( $wp_query ) ) )
 		{
 			$this->messages[] = 'sphinx_query(): sphinx_query_ordering() returned an error';
-
 			return $res;
 		}
-
-		// tax_query
-		if ( is_wp_error( $res = $this->sphinx_query_taxonomy( $client, $wp_query ) ) )
+		if ( ! empty( $res['orderby'] ) )
 		{
-			$this->messages[] = 'sphinx_query(): sphinx_query_taxonomy() returned an error';
+			$sphinxql_orderby = 'ORDER BY ' . $res['orderby'];
+			if ( ! empty( $res['ordering'] ) )
+			{
+				$sphinxql_orderby .= ' ' . $res['ordering'];
 
-			return $res;
-		}
+				// we need to select the field we're ordering by unless it's
+				// 'rand()' or 'id' (already included)
+				if ( 'rand()' != $res['orderby'] && 'id' != $res['orderby'] )
+				{
+					$sphinxql_select[] = $res['orderby'];
+				}
+			}//END if
+		}//END if
 
-		// post__in and post__not_in
-		if ( is_wp_error( $res = $this->sphinx_query_post_in_not_in( $client, $wp_query ) ) )
+		// *** tax_query ***
+		$res = $this->sphinx_query_taxonomy( $wp_query );
+		if ( ! empty( $res ) )
 		{
-			$this->messages[] = 'sphinx_query(): sphinx_query_post_in_not_in() returned an error';
-
-			return $res;
+			$sphinxql_where = array_merge( $sphinxql_where, $res );
 		}
 
-		// post_parent
-		if ( is_wp_error( $res = $this->sphinx_query_post_parent( $client, $wp_query ) ) )
+		// *** post__in and post__not_in ***
+		$res = $this->sphinx_query_post_in_not_in( $wp_query );
+		if ( ! empty( $res ) )
+		{
+			$sphinxql_where = array_merge( $sphinxql_where, $res );
+		}
+
+		// *** post_parent ***
+		$res = $this->sphinx_query_post_parent( $wp_query );
+		if ( is_wp_error( $res ) )
 		{
 			$this->messages[] = 'sphinx_query(): sphinx_query_post_parent() returned an error';
-
 			return $res;
+		}
+		if ( ! empty( $res ) )
+		{
+			$sphinxql_where[] = $res;
 		}
 
 		// pagination
-		$this->sphinx_query_pagination( $client, $wp_query );
+		$sphinxql_limit = $this->sphinx_query_pagination( $wp_query );
 
-		// these quyery vars are implemented as sphinx query string
+		// build the MATCH() conditions
 		$query_strs = array();
-
 		$query_strs[] = $this->sphinx_query_keyword( $wp_query );
-
 		$query_strs[] = $this->sphinx_query_post_type( $wp_query );
-
 		$query_strs[] = $this->sphinx_query_post_status( $wp_query );
+		$query_strs = array_filter( $query_strs );
 
-		$client->SetRankingMode( SPH_RANK_PROXIMITY_BM25 );
-		$client->SetMatchMode( SPH_MATCH_EXTENDED );
-
-		$results = $client->Query( implode( ' ', $query_strs ), $this->index_name );
-
-		if ( FALSE == $results )
+		if ( ! empty( $query_strs ) )
 		{
-			$this->messages[] = 'sphinx_query(): the sphinx client returned FALSE, possibly an error: ' . var_export( $client->GetLastError(), TRUE );
+			$sphinxql_where[] = 'MATCH( \'' . implode( ' ', $query_strs ) . '\' )';
+		}
 
-			error_log( 'go-sphinx connection error: ' . var_export( $client->GetLastError(), TRUE ) );
+		$the_query =
+			'SELECT ' . implode( ', ', $sphinxql_select ) .
+			' FROM ' . $this->index_name .
+			' WHERE ' . implode( ' AND ', $sphinxql_where ) . ' ' .
+			$sphinxql_orderby . ' ' .
+			$sphinxql_limit .
+			' OPTION ranker=proximity_bm25, max_matches=' . $this->max_results .';';
 
+		$this->total_found = 0;
+		$results = $this->wpdb()->get_col( $the_query );
+
+		if ( ! empty( $this->wpdb()->last_error ) )
+		{
+			$error_message = 'sphinx_query(): sphinxql error: ' . $this->wpdb()->last_error . ' for query: ' . $the_query;
+
+			$this->messages[] = $error_message;
+
+			error_log( 'go-sphinx wpdb error: ' . $error_message );
+
+			// 429 on all errors
 			if ( $this->error_429_on_query_error )
 			{
 				wp_die( '<p>Wow, it\'s hot in here!</p><p>The servers are really busy right now, please try your request again in a moment.</p>', 'Whoa Nelly!', array( 'response' => 429 ) );
 			} // END if
 
-			return new WP_Error( 'sphinx query error', $client->GetLastError() );
+			return new WP_Error( 'sphinx query error', $error_message );
+		}//END if
+
+		if ( empty( $results ) )
+		{
+			$this->messages[] = 'sphinx_query(): sphinxql wpdb client returned an empty result set';
+			return array();
 		}
+
+		$meta = $this->wpdb()->get_results( 'SHOW META;' );
+		if ( ! empty( $meta ) )
+		{
+			foreach( $meta as $meta_val )
+			{
+				if ( 'total_found' == $meta_val->Variable_name )
+				{
+					$this->total_found = (int) $meta_val->Value;
+					break;
+				}
+			}
+		}//END if
 
 		if ( $this->is_debug() )
 		{
 			$this->search_stats['sphinx_results'] = $results;
 		}
 
-		if ( ! isset( $results['matches'] ) )
-		{
-			$this->messages[] = 'sphinx_query(): the sphinx client returned an empty result set';
-
-			return array();
-		}
-
-		$this->matched_posts = array_keys( $results['matches'] );
-		$this->total_found = $results['total_found'];
-		$this->messages[] = 'sphinx_query(): the sphinx client returned ' . $results['total_found'] .' total results';
+		$this->matched_posts = $results;
+		$this->messages[] = 'sphinx_query(): the sphinx client returned ' . $this->total_found .' total results';
 
 		return array_slice( $this->matched_posts, 0, $this->posts_per_page );
 	}//END sphinx_query
 
+
 	/**
-	 * parse order and orderby params in $wp_query and set the appropriate
-	 * flags in the sphinx client $client.
+	 * parse the author param in $wp_query and build a sphinxql WHERE
+	 * clause for the author query if it exists.
 	 *
-	 * @retval TRUE if we're able to parse the wp_query.
+	 * author param could be one of:
+	 *  1) not set
+	 *  2) single neg
+	 *  3) list of 1 or more pos ints
+	 *
+	 * @retval a sphinxql WHERE clause if there is an author query
+	 * @retval NULL if $wp_query does not contain an author query
+	 *
+	 * No WP_Error need be returned, but if not set or NOT operator, set the sphinx filter appropriately.
+	 */
+	public function sphinx_query_author( $wp_query )
+	{
+		if ( isset( $wp_query->query['author'] ) || isset( $wp_query->query['author_name'] ) )
+		{
+			$author_id = -1;    // default must be an invalid author id
+			$exclusion = FALSE; // is this an exclusion search?
+
+			if ( isset( $wp_query->query['author'] ) )
+			{
+				// we expect this to be an author id
+				if ( is_numeric( $wp_query->query['author'] ) )
+				{
+					$author_id = (int) $wp_query->query['author'];
+
+					// check for existence of NOT operator ("-"):
+					if ( ( 0 > $author_id ) && ( -1 != $author_id ) )
+					{
+						$exclusion = TRUE;
+						$author_id = abs( $author_id );
+					}
+				}//END if
+			}//END if
+			else
+			{
+				// get an author id from author name
+				$author_name = $wp_query->query['author_name'];
+
+				$exclude_position = strpos( $author_name, '-' );
+				if ( FALSE !== $exclude_position )
+				{
+					$author_name = substr( $author_name, $exclude_position + 1 );
+					$exclusion = TRUE;
+				}
+
+				$user = get_user_by( 'slug', $author_name );
+				if ( FALSE !== $user )
+				{
+					$author_id = $user->ID;
+				}
+			}//END else
+
+			return '( post_author ' . ( $exclusion ? '!= ' : '= ' ) . $author_id . ' )';
+		} // END if
+
+		return NULL;
+	}//END sphinx_query_author
+
+	/**
+	 * parse order and orderby params in $wp_query and convert them into a
+	 * sphinxql ORDER BY clause.
+	 *
+	 * @retval an array containing the ORDER BY field ('orderby') and the
+	 *  ordering ('ordering') if all goes well
 	 * @retval WP_Error if we encounter an error or if the wp_query is not
 	 *  supported.
 	 */
-	public function sphinx_query_ordering( &$client, $wp_query )
+	public function sphinx_query_ordering( $wp_query )
 	{
-		$order = isset( $wp_query->query['order'] ) ? $wp_query->query['order'] : 'DESC';
+		$res = array(
+			'orderby' => NULL,
+			'ordering' => isset( $wp_query->query['order'] ) ? $wp_query->query['order'] : 'DESC',
+		);
 
 		if ( isset( $wp_query->query['orderby'] ) )
 		{
@@ -572,28 +679,29 @@ class GO_Sphinx
 					break;
 
 				case 'ID':
-					$client->SetSortMode( SPH_SORT_EXTENDED, '@id ' . $order );
+					$res['orderby'] = 'id';
 					break;
 
 				case 'date':
 				case 'post_date':
-					$client->SetSortMode( SPH_SORT_EXTENDED, 'post_date_gmt ' . $order );
+					$res['orderby'] = 'post_date_gmt';
 					break;
 
 				case 'modified':
-					$client->SetSortMode( SPH_SORT_EXTENDED, 'post_modified_gmt ' . $order );
+					$res['orderby'] = 'post_modified_gmt';
 					break;
 
 				case 'parent':
-					$client->SetSortMode( SPH_SORT_EXTENDED, 'post_parent ' . $order );
+					$res['orderby'] = 'post_parent';
 					break;
 
 				case 'rand':
-					$client->SetSortMode( SPH_SORT_EXTENDED, '@random ' . $order );
+					$res['orderby'] = 'rand()';
+					$res['ordering'] = NULL; // not valid in combination with rand()
 					break;
 
 				case 'comment_count':
-					$client->SetSortMode( SPH_SORT_EXTENDED, 'comment_count ' . $order );
+					$res['orderby'] = 'comment_count';
 					break;
 
 				default:
@@ -602,32 +710,42 @@ class GO_Sphinx
 		}//END if
 		else
 		{
-			$client->SetSortMode( SPH_SORT_EXTENDED, 'post_date_gmt ' . $order );
+			$res['orderby'] = 'post_date_gmt'; // default
 		}
 
-		return TRUE;
+		return $res;
 	}//END sphinx_query_ordering
 
 	/**
-	 * parse the tax_query param in $wp_query and set the appropriate
-	 * flags in the sphinx client $client.
+	 * parse the tax_query params in $wp_query and convert them into
+	 * sphinxql WHERE clauses.
 	 *
 	 * @retval TRUE if we're able to parse the wp_query.
 	 * @retval WP_Error if we encounter an error or if the wp_query is not
 	 *  supported.
 	 */
-	public function sphinx_query_taxonomy( &$client, $wp_query )
+	public function sphinx_query_taxonomy( $wp_query )
 	{
+		$wheres = array();
+
 		if ( ! is_array( $wp_query->tax_query->queries ) || empty( $wp_query->tax_query->queries ) )
 		{
-			return FALSE;
+			return $wheres;
 		}
 
 		if ( 'AND' == $wp_query->tax_query->relation )
 		{
 			foreach( $wp_query->tax_query->queries as $query )
 			{
-				// use WP_Tax_Query::transform_query() to look up the term tax ids
+				// we've seen $wp_query->tax_query->queries to contain
+				// WP_Errors (https://github.com/GigaOM/legacy-pro/issues/2231)
+				if ( is_wp_error( $query ) )
+				{
+					$this->messages[] = 'sphinx_query_taxonomy(): found a WP_Error in $wp_query->tax_query->queries (' . print_r( $query, TRUE ) . ')';
+					continue;
+				}
+
+				// use WP_Tax_Query::transform_query() to find term tax ids
 				$wp_query->tax_query->transform_query( $query, 'term_taxonomy_id' );
 				if ( empty( $query['terms'] ) )
 				{
@@ -636,7 +754,7 @@ class GO_Sphinx
 					// set a filter that'll block all results to ensure
 					// the final query result will be empty
 					// see https://github.com/Gigaom/legacy-pro/issues/673
-					$client->SetFilter( 'tt_id', array( -1 ) );
+					$wheres[] = '( tt_id = -1 )';
 					break;
 				}
 				if ( 'AND' == $query['operator'] )
@@ -644,13 +762,13 @@ class GO_Sphinx
 					// one filter per ttid
 					foreach( $query['terms'] as $ttid )
 					{
-						$client->SetFilter( 'tt_id', array( $ttid ) );
+						$wheres[] = '( tt_id = ' . $ttid . ' )';
 					}
 				}
 				else
 				{
 					// operator = "IN" or "NOT IN"
-					$client->SetFilter( 'tt_id', $query['terms'], ( 'NOT IN' == $query['operator'] ) );
+					$wheres[] = '( tt_id ' . $query['operator'] . ' ( ' . implode( ', ', $query['terms'] ) . ' ) )';
 				}
 			}//END foreach
 		}//END if
@@ -665,7 +783,7 @@ class GO_Sphinx
 				if ( empty( $query['terms'] ) )
 				{
 					// see notes above about github issue 673
-					$client->SetFilter( 'tt_id', array( -1 ) );
+					$wheres[] = '( tt_id = -1 )';
 					break;
 				}
 				if ( 'IN' != $query['operator'] )
@@ -676,51 +794,56 @@ class GO_Sphinx
 				$ttids = array_merge( $ttids, $query['terms'] );
 			}//END foreach
 
-			$client->SetFilter( 'tt_id', $ttids );
+			$wheres[] = '( tt_id IN ( ' . implode( ', ', $ttids ) . ' ) )';
 		}//END else
 
-		return TRUE;
+		return $wheres;
 	}//END sphinx_query_taxonomy
 
 	/**
-	 * parse the post__in and post__not_in params in $wp_query and set the
-	 * appropriate flags in the sphinx client $client.
+	 * parse the post__in and post__not_in params in $wp_query and convert
+	 * them into a sphinxql WHERE clause.
 	 *
-	 * @retval TRUE if we're able to parse the wp_query.
+	 * @retval an array of sphinxql WHERE clauses if $wp_query contains
+	 *  post__in and/or post__not_in params
+	 * @retval an empty array if post__in and post__not_in are not found in
+	 *  $wp_query
 	 */
-	public function sphinx_query_post_in_not_in( &$client, $wp_query )
+	public function sphinx_query_post_in_not_in( $wp_query )
 	{
+		$wheres = array();
+
 		if ( ! isset( $wp_query->query['post__in'] ) && ! isset( $wp_query->query['post__not_in'] ) )
 		{
-			return TRUE;
+			return $wheres;
 		}
 
 		if ( ! empty( $wp_query->query['post__in'] ) )
 		{
-			$client->SetFilter( '@id', $wp_query->query['post__in'] );
+			$wheres[] = '( id IN ( ' . implode( ', ', $wp_query->query['post__in'] ) . ' ) )';
 		}
 
 		if ( ! empty( $wp_query->query['post__not_in'] ) )
 		{
-			$client->SetFilter( '@id', $wp_query->query['post__not_in'], TRUE );
+			$wheres[] = '( id NOT IN ( ' . implode( ', ', $wp_query->query['post__not_in'] ) . ' ) )';
 		}
 
-		return TRUE;
+		return $wheres;
 	}//END sphinx_query_post_in_not_in
 
 	/**
-	 * parse the post_parent param in $wp_query and set the appropriate
-	 * flags in the sphinx client $client.
+	 * parse the post_parent param in $wp_query and 
 	 *
-	 * @retval TRUE if we're able to parse the wp_query.
+	 * @retval a sphinxql WHERE clause to filter the post parent if $wp_query
+	 *  contains the 'post_parent' param
 	 * @retval WP_Error if we encounter an error or if the wp_query is not
 	 *  supported.
 	 */
-	public function sphinx_query_post_parent( &$client, $wp_query )
+	public function sphinx_query_post_parent( $wp_query )
 	{
 		if ( ! isset( $wp_query->query['post_parent'] ) )
 		{
-			return TRUE;
+			return NULL;
 		}
 
 		// WP_Query only allows a single post_parent id
@@ -729,16 +852,16 @@ class GO_Sphinx
 			return new WP_Error( 'invalid post_parent id', 'invalid post_parent id (' . $wp_query->query['post_parent'] . ')' );
 		}
 
-		$client->SetFilter( 'post_parent', $wp_query->query['post_parent'] );
-
-		return TRUE;
+		return '( post_parent = ' . $wp_query->query['post_parent'] . ' )';
 	}//END sphinx_query_post_parent
 
 	/**
-	 * parse the pagination params in $wp_query and set the appropriate
-	 * flags in the sphinx client $client.
+	 * parse the pagination params in $wp_query and return the sphinxql
+	 * LIMIT clause. we will always return a LIMIT clause using default
+	 * values even if $wp_query doesn't contain any posts_per_page,
+	 * offset or paged params.
 	 */
-	public function sphinx_query_pagination( &$client, $wp_query )
+	public function sphinx_query_pagination( $wp_query )
 	{
 		// defaults
 		$offset = 0;
@@ -758,7 +881,7 @@ class GO_Sphinx
 			$offset = ($wp_query->query['paged'] - 1 ) * $this->posts_per_page;
 		}
 
-		$client->SetLimits( $offset, $this->max_results, $this->max_results );
+		return 'LIMIT ' . $offset . ', ' . $this->max_results;
 	}//END sphinx_query_pagination
 
 	/**
@@ -839,65 +962,6 @@ class GO_Sphinx
 		}
 		return $query_str;
 	}//END sphinx_query_post_status
-
-	/**
-	 * parse author param in $wp_query and set the appropriate
-	 * flags in the sphinx client $client.
-	 *
-	 * author param could be one of:
-	 *  1) not set
-	 *  2) single neg
-	 *  3) list of 1 or more pos ints
-	 *
-	 * @retval TRUE in all cases...
-	 * No WP_Error need be returned, but if not set or NOT operator, set the sphinx filter appropriately.
-	 */
-	public function sphinx_query_author( &$client, $wp_query )
-	{
-		if ( isset( $wp_query->query['author'] ) || isset( $wp_query->query['author_name'] ) )
-		{
-			$author_id = -1;    // default must be an invalid author id
-			$exclusion = FALSE; // is this an exclusion search?
-
-			if ( isset( $wp_query->query['author'] ) )
-			{
-				// we expect this to be an author id
-				if ( is_numeric( $wp_query->query['author'] ) )
-				{
-					$author_id = (int) $wp_query->query['author'];
-
-					// check for existence of NOT operator ("-"):
-					if ( ( 0 > $author_id ) && ( -1 != $author_id ) )
-					{
-						$exclusion = TRUE;
-						$author_id = abs( $author_id );
-					}
-				}//END if
-			}//END if
-			else
-			{
-				// get an author id from author name
-				$author_name = $wp_query->query['author_name'];
-
-				$exclude_position = strpos( $author_name, '-' );
-				if ( FALSE !== $exclude_position )
-				{
-					$author_name = substr( $author_name, $exclude_position + 1 );
-					$exclusion = TRUE;
-				}
-
-				$user = get_user_by( 'slug', $author_name );
-				if ( FALSE !== $user )
-				{
-					$author_id = $user->ID;
-				}
-			}//END else
-
-			$client->SetFilter( 'post_author', array( (int) $author_id ), $exclusion );
-		} // END if
-
-		return TRUE;
-	}//END sphinx_query_author
 
 	// find all taxonomies in wp_query's tax_query array and return them
 	// in an array
