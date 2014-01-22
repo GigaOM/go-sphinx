@@ -5,7 +5,7 @@ class GO_Sphinx_Admin extends GO_Sphinx
 	public function __construct()
 	{
 		add_action( 'admin_menu', array( $this, 'admin_menu' ) );
-		add_filter( 'plugin_action_links_go-sphinx/go-sphinx.php' , array( $this, 'plugin_action_links' ) );
+		add_filter( 'plugin_action_links_go-sphinx/go-sphinx.php', array( $this, 'plugin_action_links' ) );
 		add_action( 'admin_init', array( $this, 'admin_init' ) );
 	}
 
@@ -20,7 +20,7 @@ class GO_Sphinx_Admin extends GO_Sphinx
 
 	public function admin_menu()
 	{
-		add_submenu_page( 'options-general.php', 'Sphinx Configuration', 'Sphinx' , $this->admin_cap , 'go-sphinx' , array( $this, 'config_page' ) );
+		add_submenu_page( 'options-general.php', 'Sphinx Configuration', 'Sphinx', $this->admin_cap, 'go-sphinx', array( $this, 'config_page' ) );
 	}
 
 	public function plugin_action_links( $actions )
@@ -59,5 +59,5 @@ class GO_Sphinx_Admin extends GO_Sphinx
 		require __DIR__ . '/templates/config-page.php';
 
 		require __DIR__ . '/templates/test-page.php';
-	}
-}
+	}//END config_page
+}//END class
