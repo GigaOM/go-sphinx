@@ -13,7 +13,6 @@ class GO_Sphinx_Test extends GO_Sphinx
 	{
 		parent::__construct();
 		add_action( 'wp_ajax_go_sphinx_search_test', array( $this, 'search_test' ), 11 );
-		add_action( 'wp_ajax_go_sphinx_ql_test', array( $this, 'ql_test' ), 11 );
 	}
 
 	public function search_test()
@@ -2003,17 +2002,4 @@ class GO_Sphinx_Test extends GO_Sphinx
 		return $ids;
 	}//END get_ids_from_posts
 
-	/**
-	 * SphinxQL test
-	 */
-	public function ql_test()
-	{
-		$wpdb = new wpdb( 'user', 'pass', 'dbname', '127.0.0.1:9306' );
-
-		echo "<pre>\n";
-		print_r( $wpdb->get_results( 'SELECT * FROM wp_3_posts_delta, wp_3_posts WHERE match(\'' . $_REQUEST['s'] . '\')' ) );
-		echo "</pre>\n";
-
-		die;
-	}//END ql_test
 }//END GO_Sphinx_Test
