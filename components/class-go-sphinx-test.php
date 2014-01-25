@@ -2,7 +2,7 @@
 /**
  * tests to compare WP_Query and Sphinx search results.
  */
-class GO_Sphinx_Test extends GO_Sphinx
+class GO_Sphinx_Test
 {
 	public $ten_most_recent_hits_wp  = FALSE;
 	public $ten_most_recent_hits_spx = FALSE;
@@ -11,14 +11,14 @@ class GO_Sphinx_Test extends GO_Sphinx
 
 	public function __construct()
 	{
-		parent::__construct();
-		add_action( 'wp_ajax_go_sphinx_search_test', array( $this, 'search_test' ), 11 );
+		add_action( 'wp_ajax_go_sphinx_search_test', array( $this, 'search_test' ) );
+		add_action( 'wp_ajax_go_sphinx_performance_test', array( $this, 'performance_test' ) );
 	}
 
 	public function search_test()
 	{
 		// permissions check
-		if( ! current_user_can( $this->admin_cap ))
+		if( ! current_user_can( 'manage_options' ))
 		{
 			wp_die();
 		}
@@ -403,15 +403,15 @@ class GO_Sphinx_Test extends GO_Sphinx
 	{
 		echo "Sphinx query of ten posts ordered by $orderby, $order:\n\n";
 
-		$this->client = FALSE; // ensure we get a new instance
-		$client = $this->client();
+		go_sphinx()->client = FALSE; // ensure we get a new instance
+		$client = go_sphinx()->client();
 		$client->SetLimits( 0, 10, 1000 );
 		if ( 'none' != $orderby )
 		{
 			$client->SetSortMode( SPH_SORT_EXTENDED, $orderby . ' ' . $order );
 		}
 		$client->SetMatchMode( SPH_MATCH_EXTENDED );
-		$results = $client->Query( '@post_status publish', $this->index_name );
+		$results = $client->Query( '@post_status publish', go_sphinx()->index_name );
 
 		if ( FALSE !== $results )
 		{
@@ -562,8 +562,8 @@ class GO_Sphinx_Test extends GO_Sphinx
 
 	public function sphinx_most_recent_by_terms( $terms, $num_results, $page_num = FALSE )
 	{
-		$this->client = FALSE; // ensure we get a new instance
-		$client = $this->client();
+		go_sphinx()->client = FALSE; // ensure we get a new instance
+		$client = go_sphinx()->client();
 		$ttids = array();
 
 		if ( is_array( $terms ) )
@@ -608,7 +608,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 		$client->SetLimits( $offset, $num_results, 1000 );
 		$client->SetSortMode( SPH_SORT_EXTENDED, 'post_date_gmt DESC' );
 		$client->SetMatchMode( SPH_MATCH_EXTENDED );
-		$results = $client->Query( '@post_status publish', $this->index_name );
+		$results = $client->Query( '@post_status publish', go_sphinx()->index_name );
 
 		if ( FALSE === $results )
 		{
@@ -797,8 +797,8 @@ class GO_Sphinx_Test extends GO_Sphinx
 	 */
 	public function SP_mutually_exclusive_posts_test( $query_terms, $is_IN_test )
 	{
-		$this->client = FALSE; // ensure we get a new instance
-		$client = $this->client();
+		go_sphinx()->client = FALSE; // ensure we get a new instance
+		$client = go_sphinx()->client();
 
 		$ttids = array();
 		if ( $is_IN_test )
@@ -822,7 +822,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 		$client->SetLimits( 0, 10, 1000 );
 		$client->SetSortMode( SPH_SORT_EXTENDED, 'post_date_gmt DESC' );
 		$client->SetMatchMode( SPH_MATCH_EXTENDED );
-		$results = $client->Query( '@post_status publish', $this->index_name );
+		$results = $client->Query( '@post_status publish', go_sphinx()->index_name );
 
 		if ( FALSE === $results )
 		{
@@ -904,14 +904,14 @@ class GO_Sphinx_Test extends GO_Sphinx
 		) );
 		$wpq_result_ids = $this->get_ids_from_posts( $wpq_results->posts );
 
-		$this->client = FALSE; // ensure we get a new instance
-		$client = $this->client();
+		go_sphinx()->client = FALSE; // ensure we get a new instance
+		$client = go_sphinx()->client();
 		$client->SetLimits( 0, 10, 1000 );
 		//$client->SetRankingMode( SPH_RANK_SPH04 );
 		//$client->SetSortMode( SPH_SORT_EXTENDED, '@rank DESC, post_date_gmt DESC' );
 		$client->SetSortMode( SPH_SORT_EXTENDED, 'post_date_gmt DESC, @rank DESC' );
 		$client->SetMatchMode( SPH_MATCH_EXTENDED );
-		$spx_results = $client->Query( '@post_content "' . $term->name . '" @post_status publish', $this->index_name );
+		$spx_results = $client->Query( '@post_content "' . $term->name . '" @post_status publish', go_sphinx()->index_name );
 
 		if ( FALSE === $spx_results )
 		{
@@ -1032,14 +1032,14 @@ class GO_Sphinx_Test extends GO_Sphinx
 	{
 		echo 'Sphinx query of all results for author(s) (' . implode( ', ', $author_ids ) . "):\n\n";
 
-		$this->client = FALSE; // ensure we get a new instance
-		$client = $this->client();
+		go_sphinx()->client = FALSE; // ensure we get a new instance
+		$client = go_sphinx()->client();
 		$client->SetLimits( 0, 10, 1000 );
 		$client->SetSortMode( SPH_SORT_EXTENDED, 'post_date_gmt DESC' );
 		$client->SetMatchMode( SPH_MATCH_EXTENDED );
 		$client->SetFilter( 'post_author', $author_ids, $exclude );
 
-		$results = $client->Query( '@post_status publish', $this->index_name );
+		$results = $client->Query( '@post_status publish', go_sphinx()->index_name );
 
 		if ( FALSE !== $results )
 		{
@@ -1118,13 +1118,13 @@ class GO_Sphinx_Test extends GO_Sphinx
 		}//END else
 
 		// sphinx search
-		$this->client = FALSE; // ensure we get a new instance
-		$client = $this->client();
+		go_sphinx()->client = FALSE; // ensure we get a new instance
+		$client = go_sphinx()->client();
 		$client->SetLimits( 0, 10, 1000 );
 		$client->SetSortMode( SPH_SORT_EXTENDED, 'post_date_gmt DESC, @rank DESC' );
 		$client->SetMatchMode( SPH_MATCH_EXTENDED );
 		$client->SetFilter( '@id', $excluded_posts, TRUE );
-		$spx_results = $client->Query( '@post_status publish', $this->index_name );
+		$spx_results = $client->Query( '@post_status publish', go_sphinx()->index_name );
 
 		if ( FALSE === $spx_results )
 		{
@@ -1213,13 +1213,13 @@ class GO_Sphinx_Test extends GO_Sphinx
 		}//END else
 
 		// sphinx search
-		$this->client = FALSE; // ensure we get a new instance
-		$client = $this->client();
+		go_sphinx()->client = FALSE; // ensure we get a new instance
+		$client = go_sphinx()->client();
 		$client->SetLimits( 0, 10, 1000 );
 		$client->SetSortMode( SPH_SORT_EXTENDED, 'post_date_gmt DESC, @rank DESC' );
 		$client->SetMatchMode( SPH_MATCH_EXTENDED );
 		$client->SetFilter( '@id', array( $id_to_test ) );
-		$spx_results = $client->Query( '@post_status publish', $this->index_name );
+		$spx_results = $client->Query( '@post_status publish', go_sphinx()->index_name );
 
 		if ( FALSE === $spx_results )
 		{
@@ -1305,8 +1305,8 @@ class GO_Sphinx_Test extends GO_Sphinx
 
 		echo 'WP_Query for test ' . $this->test_count . ' ' . ( ( $test_failed ) ? 'FAILED' : 'PASSED' ) . ".\n\n";
 
-		$this->client = FALSE; // ensure we get a new instance
-		$client = $this->client();
+		go_sphinx()->client = FALSE; // ensure we get a new instance
+		$client = go_sphinx()->client();
 
 		$ttids = array();
 		foreach( $query_terms as $term )
@@ -1318,7 +1318,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 		$client->SetLimits( 0, 10, 1000 );
 		$client->SetSortMode( SPH_SORT_EXTENDED, 'post_date_gmt DESC' );
 		$client->SetMatchMode( SPH_MATCH_EXTENDED );
-		$results = $client->Query( '@post_status publish', $this->index_name );
+		$results = $client->Query( '@post_status publish', go_sphinx()->index_name );
 
 		if ( FALSE === $results )
 		{
@@ -1559,13 +1559,13 @@ class GO_Sphinx_Test extends GO_Sphinx
 		}
 
 		// now with sphinx
-		$this->client = FALSE; // get a new instance
-		$client = $this->client();
+		go_sphinx()->client = FALSE; // ensure we get a new instance
+		$client = go_sphinx()->client();
 		$client->SetLimits( 0, 10, 1000 );
 		$client->SetSortMode( SPH_SORT_EXTENDED, 'post_date_gmt DESC' );
 		$client->SetMatchMode( SPH_MATCH_EXTENDED );
 		$client->SetFilter( 'tt_id', array( $the_term->term_taxonomy_id ), ! $include );
-		$sp_results = $client->Query( '@post_status publish', $this->index_name );
+		$sp_results = $client->Query( '@post_status publish', go_sphinx()->index_name );
 
 		$sp_result_ids = $this->extract_sphinx_matches_ids( $sp_results );
 
@@ -1651,8 +1651,8 @@ class GO_Sphinx_Test extends GO_Sphinx
 		}
 
 		// now with sphinx
-		$this->client = FALSE; // ensure we get a new instance
-		$client = $this->client();
+		go_sphinx()->client = FALSE; // ensure we get a new instance
+		$client = go_sphinx()->client();
 		$client->SetLimits( 0, 10, 1000 );
 		$client->SetSortMode( SPH_SORT_EXTENDED, 'post_date_gmt DESC' );
 		$client->SetMatchMode( SPH_MATCH_EXTENDED );
@@ -1660,7 +1660,7 @@ class GO_Sphinx_Test extends GO_Sphinx
 		{
 			$client->SetFilter( 'tt_id', array( $ttid ) );
 		}
-		$sp_results = $client->Query( '@post_status publish', $this->index_name );
+		$sp_results = $client->Query( '@post_status publish', go_sphinx()->index_name );
 
 		$sp_result_ids = $this->extract_sphinx_matches_ids( $sp_results );
 
@@ -1754,15 +1754,15 @@ class GO_Sphinx_Test extends GO_Sphinx
 		}
 
 		// now with sphinx
-		$this->client = FALSE; // get a new instance
-		$client = $this->client();
+		go_sphinx()->client = FALSE; // ensure we get a new instance
+		$client = go_sphinx()->client();
 		$client->SetLimits( 0, 10, 1000 );
 		$client->SetSortMode( SPH_SORT_EXTENDED, 'post_date_gmt DESC' );
 		$client->SetFilter( 'tt_id', array( $the_terms[0]->term_taxonomy_id ) );
 		$client->SetFilter( 'tt_id', array( $the_terms[1]->term_taxonomy_id ) );
 
 		$client->SetMatchMode( SPH_MATCH_EXTENDED );
-		$sp_results = $client->Query( '@post_status publish', $this->index_name );
+		$sp_results = $client->Query( '@post_status publish', go_sphinx()->index_name );
 
 		$sp_result_ids = $this->extract_sphinx_matches_ids( $sp_results );
 
@@ -1964,13 +1964,13 @@ class GO_Sphinx_Test extends GO_Sphinx
 		echo 'WP_Query of child posts of ' . $the_post->post_parent . ': ' . implode( ', ', $wp_result_ids ) . "\n\n";
 
 		// sphinx
-		$this->client = FALSE; // get a new instance
-		$client = $this->client();
+		go_sphinx()->client = FALSE; // ensure we get a new instance
+		$client = go_sphinx()->client();
 		$client->SetLimits( 0, 10, 1000 );
 		$client->SetSortMode( SPH_SORT_EXTENDED, '@id DESC' );
 		$client->SetFilter( 'post_parent', array( $the_post->post_parent ) );
 		$client->SetMatchMode( SPH_MATCH_EXTENDED );
-		$sp_results = $client->Query( '@post_status publish', $this->index_name );
+		$sp_results = $client->Query( '@post_status publish', go_sphinx()->index_name );
 
 		if ( ! isset( $sp_results['matches'] ) ||
 			 ( 0 == count( $sp_results['matches'] ) ) )
@@ -2002,4 +2002,100 @@ class GO_Sphinx_Test extends GO_Sphinx
 		return $ids;
 	}//END get_ids_from_posts
 
+	public function performance_test()
+	{
+		// permissions check
+		if( ! current_user_can( 'manage_options' ))
+		{
+			wp_die();
+		}
+
+		go_sphinx()->wpdb();
+		go_sphinx()->wpdb()->queries = $GLOBALS['wpdb']->queries = array();
+		go_sphinx()->error_429_on_query_error = FALSE;
+
+		echo "<pre>\n";
+
+		// get the $n most used tags
+		$n = isset( $_GET['n'] ) ? $_GET['n'] : 5;
+		$tags = get_tags(
+			array(
+				'orderby' => 'count',
+				'order'   => 'DESC',
+				'number'  => $n,
+			)
+		);
+
+		$query_args = array(
+			'posts_per_page' => go_sphinx()->max_results,
+			'post_status'    => 'any',
+		);
+
+		// taxonomy queries
+		$t1 = microtime( TRUE );
+		$sphinx_query_time = 0.0;
+		echo "taxonomy queries using the $n most used tags\n\n";
+		foreach( $tags as $tag )
+		{
+			$query_args['tax_query'] = array(
+				array(
+					'taxonomy' => $tag->taxonomy,
+					'field'    => 'slug',
+					'terms'    => $tag->slug,
+				),
+			);
+			$posts = get_posts( $query_args );
+			echo str_pad( count( $posts ), 6, ' ', STR_PAD_LEFT ) . " hits for \"$tag->slug\"\n";
+			$this->clear_caches();
+		}//END foreach
+
+		$elapsed = microtime( TRUE ) - $t1;
+
+		echo "\n sphinx query time: " . $this->sum_wpdb_query_times( go_sphinx()->wpdb()->queries ) . "\n";
+		echo "  mysql query time: " . $this->sum_wpdb_query_times( $GLOBALS['wpdb']->queries ) . "\n";
+		echo "\ntotal elapsed time: " . number_format( $elapsed, 7, '.', '' ) . "\n\n\n";
+
+		go_sphinx()->wpdb()->queries = $GLOBALS['wpdb']->queries = array();
+
+		// keyword queries
+		$t1 = microtime( TRUE );
+		echo "---\nkeyword queries using the $n most used tags\n\n";
+		unset( $query_args['tax_query'] );
+
+		foreach( $tags as $tag )
+		{
+			$query_args['s'] = $tag->name;
+			$posts = get_posts( $query_args );
+			echo str_pad( count( $posts ), 6, ' ', STR_PAD_LEFT ) . " hits for \"$tag->slug\"\n";
+			$this->clear_caches();
+		}//END foreach
+
+		$elapsed = microtime( TRUE ) - $t1;
+		echo "\n sphinx query time: " . $this->sum_wpdb_query_times( go_sphinx()->wpdb()->queries ) . "\n";
+		echo "  mysql query time: " . $this->sum_wpdb_query_times( $GLOBALS['wpdb']->queries ) . "\n";
+		echo "\ntotal elapsed time: " . number_format( $elapsed, 7, '.', '' ) . "\n\n\n";
+
+		echo "</pre>\n";
+
+		die;
+	}//END performance_test
+
+	public function clear_caches()
+	{
+		if ( is_object( $GLOBALS['wp_object_cache'] ) )
+		{
+		  $GLOBALS['wp_object_cache']->group_ops = array();
+		  $GLOBALS['wp_object_cache']->stats = array();
+		  $GLOBALS['wp_object_cache']->memcache_debug = array();
+		  $GLOBALS['wp_object_cache']->cache = array();
+		}
+
+		// Unset some globals that can grow unnecessarily
+		unset( $GLOBALS['stats_xmlrpc_client'] );
+	} // END clear_caches
+
+	public function sum_wpdb_query_times( $queries )
+	{
+		return array_sum( wp_list_pluck( $queries, 1 ) );
+	}//END sum_wpdb_query_times
 }//END GO_Sphinx_Test
