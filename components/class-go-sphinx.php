@@ -867,10 +867,17 @@ class GO_Sphinx
 		$offset = 0;
 		$this->posts_per_page = 10;
 
-		if ( isset( $wp_query->query['posts_per_page'] ) && ( 0 < $wp_query->query['posts_per_page'] ) )
+		if ( isset( $wp_query->query['posts_per_page'] ) )
 		{
-			$this->posts_per_page = $wp_query->query['posts_per_page'];
-		}
+			if ( 0 < $wp_query->query['posts_per_page'] )
+			{
+				$this->posts_per_page = $wp_query->query['posts_per_page'];
+			}
+			elseif ( -1 == $wp_query->query['posts_per_page'] )
+			{
+				$this->posts_per_page = $this->max_results;
+			}
+		}//END if
 
 		if ( isset( $wp_query->query['offset'] ) && ( 0 < $wp_query->query['offset'] ) )
 		{
@@ -949,9 +956,12 @@ class GO_Sphinx
 		{
 			if ( is_array( $wp_query->query['post_status'] ) )
 			{
-				$query_str = '@post_status ' . implode( ' | ', $wp_query->query['post_status'] );
+				if ( ! in_array( 'any', $wp_query->query['post_status'] ) )
+				{
+					$query_str = '@post_status ' . implode( ' | ', $wp_query->query['post_status'] );
+				}
 			}
-			else
+			elseif ( 'any' != $wp_query->query['post_status'] )
 			{
 				$query_str = '@post_status ' . $wp_query->query['post_status'];
 			}
