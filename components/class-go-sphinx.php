@@ -760,6 +760,7 @@ class GO_Sphinx
 			{
 				// we've seen $wp_query->tax_query->queries to contain
 				// WP_Errors (https://github.com/GigaOM/legacy-pro/issues/2231)
+				// which may result from url manipulation by users
 				if ( is_wp_error( $query ) )
 				{
 					$this->messages[] = 'sphinx_query_taxonomy(): found a WP_Error in $wp_query->tax_query->queries (' . print_r( $query, TRUE ) . ')';
