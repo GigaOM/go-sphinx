@@ -1,9 +1,6 @@
 <?php
 class GO_Sphinx
 {
-	const SPHINX_OVERRIDE_ON  = 1;
-	const SPHINX_OVERRIDE_OFF = 2;
-
 	public $id_base = 'go-sphinx';
 	public $admin  = FALSE;
 	public $wpdb   = NULL; // our wpdb interface to sphinxql
@@ -119,7 +116,7 @@ class GO_Sphinx
 			// one to compare the results of our implementation with the
 			// results of direct sphinx queries (with the
 			// $this->qv_use_sphinx=1 url param).
-			if ( self::SPHINX_OVERRIDE_ON == $this->get_sphinx_override() )
+			if ( $this->force_use_sphinx() )
 			{
 				$this->add_filters();
 			}
@@ -258,25 +255,21 @@ class GO_Sphinx
 		}
 	}//END add_tester_filters
 
-	// check if there is a user override to turn sphinx on or off
-	// using query params.
-	// @retval FALSE if there is no override
-	// @retval 1 if sphinx should be turned on
-	// @retval 2 if sphinx should be turned off
-	public function get_sphinx_override()
+	/**
+	 * check if user supplied an override to use sphinx
+	 */
+	public function force_use_sphinx()
 	{
-		if ( ! isset( $_GET[ $this->qv_use_sphinx ] ) )
-		{
-			return FALSE;
-		}
+		return ( isset( $_GET[ $this->qv_use_sphinx ] ) && '1' == $_GET[ $this->qv_use_sphinx ] );
+	}//END force_use_sphinx
 
-		if ( '1' == $_GET[ $this->qv_use_sphinx ] )
-		{
-			return self::SPHINX_OVERRIDE_ON;
-		}
-
-		return self::SPHINX_OVERRIDE_OFF;
-	}//END get_sphinx_override
+	/**
+	 * check if user supplied an override to NOT use sphinx
+	 */
+	public function force_no_sphinx()
+	{
+		return ( isset( $_GET[ $this->qv_use_sphinx ] ) && '1' != $_GET[ $this->qv_use_sphinx ] );
+	}//END force_no_sphinx
 
 	// check if we're in debug mode or not
 	public function is_debug()
@@ -321,7 +314,7 @@ class GO_Sphinx
 		// parse $wp_query to determine if we can use sphinx for this
 		// search or not.
 		// check manual override first
-		if ( ( self::SPHINX_OVERRIDE_OFF == $this->get_sphinx_override() ) && current_user_can( 'edit_others_posts' ) )
+		if ( $this->force_no_sphinx() && current_user_can( 'edit_others_posts' ) )
 		{
 			$this->messages[] = 'use_sphinx() FALSE: get_sphinx_override() is TRUE';
 			return FALSE;
