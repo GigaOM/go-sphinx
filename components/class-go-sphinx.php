@@ -627,6 +627,13 @@ class GO_Sphinx
 		{
 			foreach( $wp_query->tax_query->queries as $query )
 			{
+				if ( is_wp_error( $query ) )
+				{
+					// see https://github.com/GigaOM/legacy-pro/issues/2231
+					// this could be caused by URL manipulation
+					continue;
+				}
+
 				// use WP_Tax_Query::transform_query() to look up the term tax ids
 				$wp_query->tax_query->transform_query( $query, 'term_taxonomy_id' );
 				if ( empty( $query['terms'] ) )
