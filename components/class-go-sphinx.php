@@ -4,6 +4,7 @@ class GO_Sphinx
 	const SPHINX_OVERRIDE_ON  = 1;
 	const SPHINX_OVERRIDE_OFF = 2;
 
+	public $id_base = 'go-sphinx';
 	public $admin  = FALSE;
 	public $wpdb   = NULL; // our wpdb interface to sphinxql
 	public $log_debug_info = FALSE;
@@ -20,6 +21,8 @@ class GO_Sphinx
 	public $secondary_index_postfix = '_delta';
 	public $qv_debug = 'go-sphinx-debug';
 	public $qv_use_sphinx = 'go-sphinx-use';
+	public $options = NULL;
+
 	public $filters_to_watch = array(
 		'posts_search',
 		'posts_where',
@@ -138,6 +141,36 @@ class GO_Sphinx
 	}//END init
 
 	/**
+	 * plugin options getter
+	 */
+	public function options()
+	{
+		if ( empty( $this->options ) )
+		{
+			$this->options = (object) apply_filters(
+				'go_config',
+				wp_parse_args( (array) get_option( $this->id_base ), (array) $this->options_default() ),
+				$this->id_base
+			);
+		}
+
+		return $this->options;
+	}// END options
+
+	public function options_default()
+	{
+		return (object) array(
+			'server'      => '127.0.0.1',
+			'port'        => 9312,
+			'mysql_port'  => 9306,
+			'timeout'     => 1,
+			'arrayresult' => TRUE,
+			'log_debug_info' => FALSE,
+			'error_429_on_query_error' => TRUE,
+		);
+	}//END options_default
+
+	/**
 	 * get an instance of our wpdb connection to sphinx. (not to be confused
 	 * with global $wpdb)
 	 */
@@ -145,24 +178,12 @@ class GO_Sphinx
 	{
 		if ( ! $this->wpdb )
 		{
-			$config = apply_filters(
-				'go_config',
-				array(
-					'server'      => '127.0.0.1',
-					'mysql_port'  => 9306,
-				),
-				'go-sphinx'
-			);
-
 			$this->wpdb = new wpdb(
 				'unused_username',
 				'unused_password',
 				'unused_dbname',
-				$config['server'] . ':' . $config['mysql_port']
+				$this->options()->server . ':' . $this->options()->mysql_port
 			);
-
-			$this->log_debug_info = isset( $config['log_debug_info'] ) ? $config['log_debug_info'] : $this->log_debug_info;
-			$this->error_429_on_query_error = isset( $config['error_429_on_query_error'] ) ? $config['error_429_on_query_error'] : $this->error_429_on_query_error;
 		}//END if
 
 		return $this->wpdb;
@@ -349,7 +370,7 @@ class GO_Sphinx
 	{
 		if ( ! $this->use_sphinx( $wp_query ) )
 		{
-			if ( $this->log_debug_info )
+			if ( $this->options()->log_debug_info )
 			{
 				$this->messages[] = 'posts_request_ids() use_sphinx() returned FALSE';
 				error_log( print_r( $this->messages, TRUE ) . "\n" . print_r( $wp_query, TRUE ) );
@@ -374,7 +395,7 @@ class GO_Sphinx
 		{
 			$this->search_stats['error'] = $result_ids;
 
-			if ( $this->log_debug_info )
+			if ( $this->options()->log_debug_info )
 			{
 				$this->messages[] = 'posts_request_ids() got an error from sphinx_query()';
 				error_log( print_r( $this->messages, TRUE ) . "\n" . print_r( $wp_query, TRUE ) );
@@ -555,7 +576,7 @@ class GO_Sphinx
 			error_log( 'go-sphinx wpdb error: ' . $error_message );
 
 			// 429 on all errors
-			if ( $this->error_429_on_query_error )
+			if ( $this->options()->error_429_on_query_error )
 			{
 				wp_die( '<p>Wow, it\'s hot in here!</p><p>The servers are really busy right now, please try your request again in a moment.</p>', 'Whoa Nelly!', array( 'response' => 429 ) );
 			} // END if
@@ -739,6 +760,7 @@ class GO_Sphinx
 			{
 				// we've seen $wp_query->tax_query->queries to contain
 				// WP_Errors (https://github.com/GigaOM/legacy-pro/issues/2231)
+				// which may result from url manipulation by users
 				if ( is_wp_error( $query ) )
 				{
 					$this->messages[] = 'sphinx_query_taxonomy(): found a WP_Error in $wp_query->tax_query->queries (' . print_r( $query, TRUE ) . ')';
@@ -867,10 +889,17 @@ class GO_Sphinx
 		$offset = 0;
 		$this->posts_per_page = 10;
 
-		if ( isset( $wp_query->query['posts_per_page'] ) && ( 0 < $wp_query->query['posts_per_page'] ) )
+		if ( isset( $wp_query->query['posts_per_page'] ) )
 		{
-			$this->posts_per_page = $wp_query->query['posts_per_page'];
-		}
+			if ( 0 < $wp_query->query['posts_per_page'] )
+			{
+				$this->posts_per_page = $wp_query->query['posts_per_page'];
+			}
+			elseif ( -1 == $wp_query->query['posts_per_page'] )
+			{
+				$this->posts_per_page = $this->max_results;
+			}
+		}//END if
 
 		if ( isset( $wp_query->query['offset'] ) && ( 0 < $wp_query->query['offset'] ) )
 		{
@@ -949,9 +978,12 @@ class GO_Sphinx
 		{
 			if ( is_array( $wp_query->query['post_status'] ) )
 			{
-				$query_str = '@post_status ' . implode( ' | ', $wp_query->query['post_status'] );
+				if ( ! in_array( 'any', $wp_query->query['post_status'] ) )
+				{
+					$query_str = '@post_status ' . implode( ' | ', $wp_query->query['post_status'] );
+				}
 			}
-			else
+			elseif ( 'any' != $wp_query->query['post_status'] )
 			{
 				$query_str = '@post_status ' . $wp_query->query['post_status'];
 			}
