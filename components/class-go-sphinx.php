@@ -764,6 +764,8 @@ class GO_Sphinx
 				$wp_query->tax_query->transform_query( $query, 'term_taxonomy_id' );
 				if ( is_wp_error( $query ) )
 				{
+					//TODO: report back that one or more requested terms
+					// were excluded from the search criteria
 					$this->messages[] = 'WP_Tax_Query::transform_query() returned an error: ' . print_r( $query, TRUE );
 					continue;
 				}
