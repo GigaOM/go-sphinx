@@ -762,6 +762,12 @@ class GO_Sphinx
 
 				// use WP_Tax_Query::transform_query() to find term tax ids
 				$wp_query->tax_query->transform_query( $query, 'term_taxonomy_id' );
+				if ( is_wp_error( $query ) )
+				{
+					$this->messages[] = 'WP_Tax_Query::transform_query() returned an error: ' . print_r( $query, TRUE );
+					continue;
+				}
+
 				if ( empty( $query['terms'] ) )
 				{
 					// if a tax query has no term then it means some or all
