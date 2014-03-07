@@ -624,6 +624,11 @@ class GO_Sphinx
 	 */
 	public function sphinx_query_author( $wp_query )
 	{
+		if ( ! $wp_query->is_author )
+		{
+			return NULL;
+		}
+
 		if ( isset( $wp_query->query['author'] ) || isset( $wp_query->query['author_name'] ) )
 		{
 			$author_id = -1;    // default must be an invalid author id
