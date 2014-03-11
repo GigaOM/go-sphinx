@@ -933,11 +933,11 @@ class GO_Sphinx
 			return '';
 		}
 
-		// strip out escaping backslashes added by WP, urldecode/trim
-		// the query string so sphinx sees the original query. (not using
-		// wp_kses() here because the query string is not going to be
-		// consumed by a browser.)
-		return '@(post_content,content) ' . trim( urldecode( stripslashes( $wp_query->query['s'] ) ) );
+		// the keyword string is already escaped by WP (backslashes, quotes,
+		// etc.). we just have to trim the query string before feeding it
+		// into sphinxql. (not using wp_kses() here because the query string
+		// is not going to be consumed by a browser but by sphinx.)
+		return '@(post_content,content) ' . trim( $wp_query->query['s'] );
 	}//END sphinx_query_keyword
 
 	/**
