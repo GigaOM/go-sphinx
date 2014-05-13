@@ -133,7 +133,7 @@ class GO_Sphinx
 		{
 			$plugin_url = untrailingslashit( plugin_dir_url( __FILE__ ) );
 			wp_register_script( 'go-sphinx-js', $plugin_url . '/js/go-sphinx.js', array( 'jquery' ), $this->version, TRUE );
-			wp_enqueue_script( 'go-sphinx-js');
+			wp_enqueue_script( 'go-sphinx-js' );
 		}
 	}//END init
 
@@ -248,7 +248,7 @@ class GO_Sphinx
 	public function add_tester_filters()
 	{
 		// hook our callback before and after all other callbacks
-		foreach( $this->filters_to_watch as $filter )
+		foreach ( $this->filters_to_watch as $filter )
 		{
 			add_filter( $filter, array( $this, 'check_query' ), 1 );
 			add_filter( $filter, array( $this, 'check_query' ), 101 );
@@ -323,7 +323,7 @@ class GO_Sphinx
 		// do not enable sphinx if we receive an unsupported query var.
 		// note we must handle query vars which're taxonomy names.
 		$queried_taxonomies = $this->extract_taxonomies( $wp_query );
-		foreach( $wp_query->query as $key => $val )
+		foreach ( $wp_query->query as $key => $val )
 		{
 			if (
 				! in_array( $key, $this->supported_query_vars ) &&
@@ -439,7 +439,7 @@ class GO_Sphinx
 	}//END found_posts_query
 
 	// overrides the number of posts found, this affects pagination.
-	public function found_posts( $found_posts, $wp_query )
+	public function found_posts( $found_posts, $unused_wp_query )
 	{
 		if ( isset( $this->total_found ) && $this->total_found )
 		{
@@ -458,7 +458,7 @@ class GO_Sphinx
 	//
 	// caveat: we will only return the smaller of $max or $this->max_results
 	//
-	public function scriblio_pre_get_matching_post_ids( $ignorable, $max )
+	public function scriblio_pre_get_matching_post_ids( $unused, $unused_max )
 	{
 		if ( ! isset( $this->matched_posts ) || empty( $this->matched_posts ) )
 		{
@@ -586,7 +586,7 @@ class GO_Sphinx
 		$meta = $this->wpdb()->get_results( 'SHOW META;' );
 		if ( ! empty( $meta ) )
 		{
-			foreach( $meta as $meta_val )
+			foreach ( $meta as $meta_val )
 			{
 				if ( 'total_found' == $meta_val->Variable_name )
 				{
@@ -754,7 +754,7 @@ class GO_Sphinx
 
 		if ( 'AND' == $wp_query->tax_query->relation )
 		{
-			foreach( $wp_query->tax_query->queries as $query )
+			foreach ( $wp_query->tax_query->queries as $query )
 			{
 				// we've seen $wp_query->tax_query->queries to contain
 				// WP_Errors (https://github.com/GigaOM/legacy-pro/issues/2231)
@@ -788,7 +788,7 @@ class GO_Sphinx
 				if ( 'AND' == $query['operator'] )
 				{
 					// one filter per ttid
-					foreach( $query['terms'] as $ttid )
+					foreach ( $query['terms'] as $ttid )
 					{
 						$wheres[] = '( tt_id = ' . $ttid . ' )';
 					}
@@ -806,7 +806,7 @@ class GO_Sphinx
 			// we do not support the outer OR + inner AND case nor the
 			// outer OR + inner "NOT IN" case
 			$ttids = array();
-			foreach( $wp_query->tax_query->queries as $query )
+			foreach ( $wp_query->tax_query->queries as $query )
 			{
 				if ( empty( $query['terms'] ) )
 				{
@@ -913,7 +913,7 @@ class GO_Sphinx
 		}
 		elseif ( isset( $wp_query->query['paged'] ) && ( 0 < $wp_query->query['paged'] ) )
 		{
-			$offset = ($wp_query->query['paged'] - 1 ) * $this->posts_per_page;
+			$offset = ( $wp_query->query['paged'] - 1 ) * $this->posts_per_page;
 		}
 
 		return 'LIMIT ' . $offset . ', ' . $this->max_results;
@@ -1012,7 +1012,7 @@ class GO_Sphinx
 			return $taxonomies;
 		}
 
-		foreach( $wp_query->tax_query->queries as $tax_query )
+		foreach ( $wp_query->tax_query->queries as $tax_query )
 		{
 			$taxonomies[] = $tax_query['taxonomy'];
 		}
