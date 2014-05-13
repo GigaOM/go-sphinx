@@ -937,7 +937,7 @@ class GO_Sphinx
 		// etc.). we just have to trim the query string before feeding it
 		// into sphinxql. (not using wp_kses() here because the query string
 		// is not going to be consumed by a browser but by sphinx.)
-		return '@(post_content,content) ' . trim( $wp_query->query['s'] );
+		return '@(post_content,content) ' . $this->sanitize_sphinx_query( $wp_query->query['s'] );
 	}//END sphinx_query_keyword
 
 	/**
@@ -1018,6 +1018,21 @@ class GO_Sphinx
 		}
 		return $taxonomies;
 	}//END extract_taxonomies
+
+	/**
+	 * remove special characters from $string that're not indexed by default.
+	 * the special characters are taken from:
+ 	 * https://code.google.com/p/sphinxsearch/source/browse/branches/rel21/api/sphinxapi.php#1607
+	 *
+	 * @param $string string the string to be escaped
+	 * @return string content of $string with the sphinx special characters
+	 *  removed
+	 */
+	public function sanitize_sphinx_query( $string )
+	{
+		// characters to remove
+		return preg_replace( '#[()|!@~&\/^$=?\\\\-]#', '', trim( $string ) );
+	}//END sanitize_sphinx_query
 }//END class
 
 /**
