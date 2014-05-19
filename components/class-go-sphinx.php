@@ -549,13 +549,17 @@ class GO_Sphinx
 			$sphinxql_where[] = 'MATCH( \'' . implode( ' ', $query_strs ) . '\' )';
 		}
 
+		// the ranker expression is based on the SPH_RANK_SPH04 (http://sphinxsearch.com/docs/2.1.7/weighting.html#idm1599401328)
+		// but with matches near the start of the content (title) boosted
+		$ranker = 'ranker=expr( \'sum ( ( 4 * lcs + 17 * ( min_hit_pos <= 5 ) + exact_hit ) * user_weight ) * 1000 + bm25 \')';
+
 		$the_query =
 			'SELECT ' . implode( ', ', $sphinxql_select ) .
 			' FROM ' . $this->index_name .
 			' WHERE ' . implode( ' AND ', $sphinxql_where ) . ' ' .
 			$sphinxql_orderby . ' ' .
 			$sphinxql_limit .
-			' OPTION ranker=proximity_bm25, max_matches=' . $this->max_results .';';
+			' OPTION ' . $ranker . ', max_matches=' . $this->max_results .';';
 
 		$this->total_found = 0;
 		$results = $this->wpdb()->get_col( $the_query );
@@ -729,7 +733,7 @@ class GO_Sphinx
 		}//END if
 		else
 		{
-			$res['orderby'] = 'post_date_gmt'; // default
+			$res['orderby'] = FALSE;
 		}
 
 		return $res;
@@ -1031,7 +1035,7 @@ class GO_Sphinx
 	public function sanitize_sphinx_query( $string )
 	{
 		// characters to remove
-		return preg_replace( '#[()|!@~&\/^$=?\\\\-]#', '', trim( $string ) );
+		return preg_replace( '#[()|!@~&\/^$=?\\\\-]#', ' ', trim( $string ) );
 	}//END sanitize_sphinx_query
 }//END class
 
