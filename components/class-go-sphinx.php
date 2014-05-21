@@ -164,6 +164,7 @@ class GO_Sphinx
 			'arrayresult' => TRUE,
 			'log_debug_info' => FALSE,
 			'error_429_on_query_error' => TRUE,
+			'ranker' => 'proximity_bm25',
 		);
 	}//END options_default
 
@@ -555,7 +556,7 @@ class GO_Sphinx
 			' WHERE ' . implode( ' AND ', $sphinxql_where ) . ' ' .
 			$sphinxql_orderby . ' ' .
 			$sphinxql_limit .
-			' OPTION ranker=proximity_bm25, max_matches=' . $this->max_results .';';
+			' OPTION ranker=' . $this->options()->ranker . ', max_matches=' . $this->max_results .';';
 
 		$this->total_found = 0;
 		$results = $this->wpdb()->get_col( $the_query );
@@ -729,8 +730,18 @@ class GO_Sphinx
 		}//END if
 		else
 		{
-			$res['orderby'] = 'post_date_gmt'; // default
-		}
+			// the default ordering depends on whether this is a keyword
+			// search or not. in general we use the same default ordering
+			// as WP_Query, which's the post date
+			$res['orderby'] = 'post_date_gmt';
+
+			// but if this is a keyword query then we don't want to set
+			// a default order which will fall back to using sphinx's ranking
+			if ( isset( $wp_query->query['s'] ) && ! empty( $wp_query->query['s'] ) )
+			{
+				$res['orderby'] = FALSE;
+			}
+		}//END else
 
 		return $res;
 	}//END sphinx_query_ordering
@@ -1031,7 +1042,7 @@ class GO_Sphinx
 	public function sanitize_sphinx_query( $string )
 	{
 		// characters to remove
-		return preg_replace( '#[()|!@~&\/^$=?\\\\-]#', '', trim( $string ) );
+		return preg_replace( '#[()|!@~&\/^$=?\\\\-]#', ' ', trim( $string ) );
 	}//END sanitize_sphinx_query
 }//END class
 
