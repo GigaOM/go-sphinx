@@ -730,8 +730,18 @@ class GO_Sphinx
 		}//END if
 		else
 		{
-			$res['orderby'] = FALSE;
-		}
+			// the default ordering depends on whether this is a keyword
+			// search or not. in general we use the same default ordering
+			// as WP_Query, which's the post date
+			$res['orderby'] = 'post_date_gmt';
+
+			// but if this is a keyword query then we don't want to set
+			// a default order which will fall back to using sphinx's ranking
+			if ( isset( $wp_query->query['s'] ) && ! empty( $wp_query->query['s'] ) )
+			{
+				$res['orderby'] = FALSE;
+			}
+		}//END else
 
 		return $res;
 	}//END sphinx_query_ordering
