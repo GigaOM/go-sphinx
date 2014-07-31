@@ -81,6 +81,7 @@ class GO_Sphinx
 		'numberposts',
 		'output',
 		'suppress_filters',
+		'wijax',
 	);
 	// supported orderby keywords
 	public $supported_order_by = array(
