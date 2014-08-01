@@ -70,8 +70,8 @@ class GO_Sphinx
 		'tag_slug__and',
 		'tax_query',
 
-		/* these are allowed to pass through either because we allow them
-		   or because they're alternate keys used by WP */
+		// these are allowed to pass through either because we allow them
+		// or because they're alternate keys used by WP
 		'exclude',
 		'feed',
 		'fields',
