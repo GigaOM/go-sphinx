@@ -626,7 +626,7 @@ class GO_Sphinx
 	 */
 	public function sphinx_query_author( $wp_query )
 	{
-		if ( ! $wp_query->is_author )
+		if ( ! $wp_query->is_author || ( ! $wp_query->get( 'author' ) && ! $wp_query->get( 'author_name' ) ) )
 		{
 			return NULL;
 		}
