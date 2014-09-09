@@ -2,6 +2,8 @@
 
 class GO_Sphinx_Admin extends GO_Sphinx
 {
+	private $admin_cap = 'manage_options';
+
 	public function __construct()
 	{
 		add_action( 'admin_menu', array( $this, 'admin_menu' ) );
@@ -12,7 +14,7 @@ class GO_Sphinx_Admin extends GO_Sphinx
 	public function admin_init()
 	{
 		// load the test suite if the user has permissions
-		if( current_user_can( $this->admin_cap ))
+		if ( current_user_can( $this->admin_cap ) )
 		{
 			$this->test();
 		}
@@ -35,7 +37,7 @@ class GO_Sphinx_Admin extends GO_Sphinx
 
 	public function config_page()
 	{
-		if( ! function_exists( 'bcms_search' ) )
+		if ( ! function_exists( 'bcms_search' ) )
 		{
 			echo '<h2>Please install bCMS and activate the full text search</h2>';
 			return;
