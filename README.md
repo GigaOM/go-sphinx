@@ -83,4 +83,4 @@ This plugin is on Github: https://github.com/gigaOM/go-sphinx
 1. Use the configuration template to start indexing in Sphinx.
 1. Enjoy the performance boost.
 
-Note: the plugin expects the Sphinx server IP:port to be 127.0.0.1:9306. For now, changing that requires <a href="https://github.com/GigaOM/go-sphinx/blob/master/components/class-go-sphinx.php#L148">filtering `go_config`</a> to replace <a href="https://github.com/GigaOM/go-sphinx/blob/master/components/class-go-sphinx.php#L158">the defaults</a>.
+Note: the plugin expects the Sphinx server IP:port to be `127.0.0.1:9306`. For now, changing that requires <a href="https://github.com/GigaOM/go-sphinx/blob/master/components/class-go-sphinx.php#L148">filtering `go_config`</a> to replace <a href="https://github.com/GigaOM/go-sphinx/blob/master/components/class-go-sphinx.php#L158">the defaults</a>.
