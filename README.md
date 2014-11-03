@@ -1,4 +1,4 @@
-# === Gigaom New Relic ===
+# === Gigaom Sphinx ===
 
 Contributors: wluo, okredo, misterbisson
 
