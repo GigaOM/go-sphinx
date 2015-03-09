@@ -274,9 +274,16 @@ class GO_Sphinx
 	}//END force_no_sphinx
 
 	// check if we're in debug mode or not
-	public function is_debug()
+	public function is_debug( $extended_debug = FALSE )
 	{
-		return ( isset( $_GET[ $this->qv_debug ] ) && current_user_can( 'edit_others_posts' ) );
+		$is_debug = isset( $_GET[ $this->qv_debug ] );
+
+		if ( ! $extended_debug )
+		{
+			return $is_debug;
+		}//end if
+
+		return ( $is_debug && current_user_can( 'edit_others_posts' ) );
 	}//END is_debug
 
 	// the callback to track whether another plugin has altered the
@@ -405,9 +412,16 @@ class GO_Sphinx
 			$this->search_stats['posts_sphinx'] = $result_ids;
 			$this->search_stats['posts_equality'] = ( $this->search_stats['posts_mysql'] == $this->search_stats['posts_sphinx'] );
 
+			if ( ! $this->is_debug( TRUE ) )
+			{
+				$this->search_stats = array(
+					'posts_equality' => $this->search_stats['posts_equality'],
+				);
+			}//end if
+
 			wp_localize_script( 'go-sphinx-js', 'sphinx_results', (array) $this->search_stats );
 			wp_localize_script( 'go-sphinx-js', 'sphinx_messages', (array) $this->messages );
-		}
+		}//end if
 
 		if ( 0 < count( $result_ids ) )
 		{
@@ -598,7 +612,7 @@ class GO_Sphinx
 			}
 		}//END if
 
-		if ( $this->is_debug() )
+		if ( $this->is_debug( TRUE ) )
 		{
 			$this->search_stats['sphinx_results'] = $results;
 		}
