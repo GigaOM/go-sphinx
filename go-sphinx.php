@@ -5,7 +5,7 @@
  * Version: 0.1
  * Author: Gigaom
  * Author URI: https://gigaom.com
- * Contributors: misterbisson, okredo, zbtirrell, wluo, camwyn
+ * Contributors: misterbisson, okredo, zbtirrell, wluo, camwyn, borkweb
  * License: GPLv2
  * License URI: http://www.gnu.org/licenses/gpl-2.0.html
  */
